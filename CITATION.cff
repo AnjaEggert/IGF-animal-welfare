@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Galow
+    given-names: Anne-Marie
+    orcid: https://orcid.org/0000-0002-7968-3152
+  - family-names: Ohde
+    given-names: Daniela
+    orcid: https://orcid.org/0000-0002-0669-8409
+  - family-names: Eggert
+    given-names: Anja
+    orcid: https://orcid.org/0000-0003-3893-6851
+  - family-names: Walz
+    given-names: Christina
+  - family-names: Zenk
+    given-names: Marianne
+  - family-names: Umesh
+    given-names: Chaithra
+    orcid: https://orcid.org/0000-0002-4400-5386
+  - family-names: Bej
+    given-names: Saptarshi
+    orcid: https://orcid.org/0000-0003-1835-6139
+  - family-names: Wolkenhauer
+    given-names: Olaf
+    orcid: https://orcid.org/0000-0001-6105-2937
+  - family-names: Hoeflich
+    given-names: Andreas
+    orcid: https://orcid.org/0000-0003-2018-2836
+
+title: "IGF-animal-welfare"
+version: 1.0
+date-released: 2025-03-14
+license: cc-by-4.0
+repository-code: "https://github.com/AnjaEggert/IGF-animal-welfare.git"

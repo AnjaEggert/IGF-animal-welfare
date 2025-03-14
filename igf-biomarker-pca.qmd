@@ -1,0 +1,835 @@
+---
+title: "PCA + Cluster (Igf & animal welfare)"
+author: "Anja Eggert & Anne-Marie Galow"
+date: "`r Sys.Date()`" 
+editor: visual
+code-fold: false
+number-sections: true
+highlight-style: pygments
+toc: true
+format: html
+self-contained: true
+---
+
+# R Libraries
+
+```{r, libraries, warning=FALSE, message=FALSE, echo=TRUE}
+library(tidyverse)     # tidy universe
+library(readxl)        # read Excel files
+library(kableExtra)    # html-table
+library(rstatix)       # data summary
+library(patchwork)     # combine plots
+library(ggplotify)     # Converts base R plots to ggplot2 objects
+library(mixOmics)      # PCA, PLS-DA
+library(factoextra)    # dendrogram
+library(dendextend)    # dendrogram, labels
+library(smd)           # standardized mean difference of clusters
+```
+
+```{r, my_theme, echo = FALSE}
+my_theme = theme_bw() +
+  theme(text = element_text(family = "sans"),
+        plot.title   = element_text(face = "plain", size = 14),
+        axis.title   = element_text(face = "bold",  size = 14),
+        legend.title = element_text(face = "bold",  size = 18),
+        legend.text  = element_text(face = "bold",  size = 16),
+        axis.text    = element_text(size = 12, angle = 0, vjust = 0.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+my_theme_load = theme_minimal() +
+  theme(text = element_text(family = "sans"),
+        plot.title   = element_text(face = "plain", size = 14),
+        axis.title   = element_text(face = "bold",  size = 14),
+        legend.title = element_text(face = "bold",  size = 18),
+        legend.text  = element_text(face = "bold",  size = 16),
+        axis.text    = element_text(size = 12, angle = 0, vjust = 0.5),
+        panel.grid.major.y = element_blank(),
+        panel.grid.major.x = element_line(linewidth = 0.75, linetype = 2),
+        panel.grid.minor = element_blank())
+```
+
+```{r, seed}
+set.seed(1989)
+```
+
+# Imputed data
+
+-   many dropouts in data set due to different reasons
+-   data gaps were imputed with KNN method by Chaithra Umesh from Olaf Wolkenhauer's group
+
+# Data
+
+## Read data
+
+Data processing of the original done in file "igf-biomarker-summary-stats.qmd".
+
+```{r, read-data-1}
+load("./data/data-processed.RData")
+```
+
+```{r, read-data-2}
+dat.imp <- read_xlsx("./data/data-matrix.xlsx",
+                 sheet = "data_imp",
+                 col_names = TRUE,
+                 na = c("", "n.A."),
+                 .name_repair = "universal")
+```
+
+## Data adjustments
+
+```{r}
+dat.ori <- dat.w
+rm(dat.l, dat.w)
+```
+
+```{r}
+dat.imp <- dat.imp |> 
+  # make factors
+  mutate_at(vars(husbandry,
+                 sow,
+                 insem.group,
+                 litter.no) , ~as.factor(.)) |> 
+  # unique identifier is combination of sow and litter
+  mutate(id = as.factor(paste0(sow, ".", litter.no))) |> 
+  relocate(id, .after = litter.no)
+```
+
+Only keep those parameters in the original data set, where we have imputed data from:
+
+```{r}
+dat.ori <- dat.ori |> 
+  dplyr::select(intersect(names(dat.imp), names(dat.ori)))
+```
+
+# Data summary
+
+## Original data
+
+```{r}
+dat.ori |>  
+  group_by(husbandry) |>  
+  rstatix::get_summary_stats(cort.sal.105dpc : stc1.8dpp, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable) |>  
+  kable(caption = "Summary statistics: original data") |> 
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 10) |>  
+  scroll_box(width = "800px")
+```
+
+## Imputed data
+
+```{r}
+dat.imp |>  
+  group_by(husbandry) |>  
+  rstatix::get_summary_stats(cort.sal.105dpc : stc1.8dpp, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable) |>  
+  kable(caption = "Summary statistics: imputed data") |> 
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 10) |>  
+  scroll_box(width = "800px")
+```
+
+# Original vs. imputed data
+
+## Rearrange & combine data
+
+```{r}
+dat.ori.l <- dat.ori %>%
+  pivot_longer(
+    cols = -c(husbandry:id),
+    names_to = c("parameter", "time"),
+    names_pattern = "(.*)\\.(\\d+dpc|\\d+dpp)",
+    values_to = "value.ori") |> 
+  mutate_at(vars(parameter,
+                 time) , ~as.factor(.)) |> 
+  arrange(husbandry, parameter, time)
+```
+
+```{r}
+dat.imp.l <- dat.imp %>%
+  pivot_longer(
+    cols = -c(husbandry:id),
+    names_to = c("parameter", "time"),
+    names_pattern = "(.*)\\.(\\d+dpc|\\d+dpp)",
+    values_to = "value.imp") |> 
+  mutate_at(vars(parameter,
+                 time) , ~as.factor(.)) |> 
+  arrange(husbandry, parameter, time)
+```
+
+```{r}
+dat.l <- dat.imp.l |>  
+  dplyr::select(!c(husbandry, sow, insem.group, litter.no)) |>
+  left_join(dat.ori.l, by = c("id", "parameter", "time")) |> 
+  pivot_longer(c(value.ori, value.imp), 
+               names_to = "datatype", 
+               values_to = "value") |>  
+  mutate(datatype = str_extract(datatype, "[^.]+$")) |>
+  mutate_at(vars(datatype), ~as.factor(.)) |>  
+  arrange(parameter, time, datatype)
+```
+
+## Plot
+
+```{r}
+# provide new labels as a named character vector:
+# New facet label names for parameter variable
+parameter.labs <- c("IGF bioactivity", "Cortisol (saliva)", "IGF1", "IGF2", "IGF BP2", "IGF BP3", "STC1")
+names(parameter.labs) <- c("bioact.ser", "cort.sal", "igf1.ser", "igf2.ser", "igfbp2.ser", "igfbp3.ser", "stc1" )
+
+# New facet label names for time variable
+time.labs <- c("30dpc", "105dpc", "8dpp")
+names(time.labs) <- c("30dpc", "105dpc", "8dpp")
+
+plot <- dat.l |>  
+  mutate(time = fct_relevel(time, c("30dpc", "105dpc", "8dpp"))) |> 
+  # plot
+  ggplot(aes(x = husbandry,
+             y = value)) +
+  geom_boxplot(aes(fill = datatype, col = datatype),
+               position = position_dodge(width = 0.6), 
+               outlier.shape = NA, 
+               width = 0.3,
+               linewidth = 0.2) +
+  geom_jitter(aes(color = datatype), 
+              position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.6), 
+              shape = 4, size = 2) + 
+  scale_color_manual(values = c("grey70", "grey70"),
+                     guide = "none") +
+  scale_fill_manual(values = c("deepskyblue", "firebrick1"),
+                    labels = c("original", "imputed")) +
+  scale_x_discrete(labels = c("Conventional", "Ecological")) +
+  labs(x = "Husbandry",
+       y = "",
+       fill = "Data set") +
+  facet_grid(parameter ~ time, 
+             scales = "free_y",
+             labeller = labeller(parameter = parameter.labs,
+                                 time = time.labs)) +
+  my_theme +
+  theme(strip.text.y = element_text(angle = 0),
+        strip.text.x = element_text(face = "bold", size = 14),
+        legend.position = "bottom") +
+  guides(fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=10, fig.width=10, warning=FALSE}
+plot
+```
+
+```{r, eval = TRUE}
+png("./plots/ori-imp.png",
+     width = 450, height = 300, units = "mm",
+     pointsize = 10, res = 600)
+
+plot
+
+dev.off()
+```
+
+# PCA
+
+We use unsupervised PCA to explore data structure and to reduce dimensionality without assuming class differences. We also explore which variables contribute the most to explaining the variance in the data.
+
+## Original and imputed data
+
+We have `r sum(is.na(dat.ori))` missings of `r 40*17`, i.e. `r round((sum(is.na(dat.ori))*100)/(40*17),1)` % of the values are missing.
+
+We only use complete cases for the PCA. This are 8 conventional and 9 ecological data.
+
+```{r}
+dat.ori.nonan <- dat.ori |>  
+  drop_na() |> 
+  droplevels()
+```
+
+```{r}
+dat.ori.nonan |>  
+  group_by(husbandry) |>  
+  rstatix::get_summary_stats(cort.sal.105dpc : stc1.8dpp, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable) |>  
+  kable(caption = "Summary statistics: complete cases of original data") |> 
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 10) |>  
+  scroll_box(width = "800px")
+```
+
+```{r}
+var.ori <- dat.ori.nonan |>  
+  dplyr::select(cort.sal.105dpc:stc1.8dpp) |> 
+  # rename columns
+  rename(`Cortisol 105dpc (saliva)` = cort.sal.105dpc,
+         `Cortisol 8dpp (saliva)`   = cort.sal.8dpp,
+         `IGF Bioactivity 30pc`     = bioact.ser.30dpc,
+         `IGF Bioactivity 105dpc`   = bioact.ser.105dpc,
+         `IGF Bioactivity 8dpp`     = bioact.ser.8dpp,
+         `IGF2 105dpc`              = igf2.ser.105dpc,
+         `IGF2 8dpp`                = igf2.ser.8dpp,
+         `IGF1 105dpc`              = igf1.ser.105dpc,
+         `IGF1 8dpp`                = igf1.ser.8dpp,
+         `IGF BP2 105dpc`           = igfbp2.ser.105dpc,
+         `IGF BP2 8dpp`             = igfbp2.ser.8dpp,
+         `IGF BP3 105dpc`           = igfbp3.ser.105dpc,
+         `IGF BP3 8dpp`             = igfbp3.ser.8dpp,
+         `STC1 105dpc`              = stc1.105dpc,
+         `STC1 8dpp`                = stc1.8dpp)
+```
+
+```{r}
+var.imp <- dat.imp |>  
+  dplyr::select(cort.sal.105dpc:stc1.8dpp) |> 
+  # rename columns
+  rename(`Cortisol 105dpc (saliva)` = cort.sal.105dpc,
+         `Cortisol 8dpp (saliva)`   = cort.sal.8dpp,
+         `IGF Bioactivity 30pc`     = bioact.ser.30dpc,
+         `IGF Bioactivity 105dpc`   = bioact.ser.105dpc,
+         `IGF Bioactivity 8dpp`     = bioact.ser.8dpp,
+         `IGF2 105dpc`              = igf2.ser.105dpc,
+         `IGF2 8dpp`                = igf2.ser.8dpp,
+         `IGF1 105dpc`              = igf1.ser.105dpc,
+         `IGF1 8dpp`                = igf1.ser.8dpp,
+         `IGF BP2 105dpc`           = igfbp2.ser.105dpc,
+         `IGF BP2 8dpp`             = igfbp2.ser.8dpp,
+         `IGF BP3 105dpc`           = igfbp3.ser.105dpc,
+         `IGF BP3 8dpp`             = igfbp3.ser.8dpp,
+         `STC1 105dpc`              = stc1.105dpc,
+         `STC1 8dpp`                = stc1.8dpp)
+```
+
+We have repeated measurements per sow, but multilevel analysis can only be performed when all samples are repeated at least once. `multilevel = dat.imp$sow.no` not possible here.
+
+```{r}
+table(dat.ori.nonan$sow)
+table(dat.imp$sow)
+```
+
+## Run PCA
+
+```{r}
+# run the method, centering + scaling?
+pca.ori <- mixOmics::pca(var.ori, 
+                         center = TRUE, scale = TRUE, 
+                         ncomp = 4) 
+pca.imp <- mixOmics::pca(var.imp,
+                         center = TRUE, scale = TRUE, 
+                         ncomp = 4) 
+```
+
+### Individuals plots
+
+```{r}
+plotIndiv(pca.ori,
+          comp         = c(1, 2),   # Specify PCs to plot
+          ind.names    = dat.ori.nonan$id,
+          group        = dat.ori.nonan$husbandry,
+          title        = 'PCA of original data, no dropouts',
+          legend       = TRUE, 
+          legend.title = 'Husbandry (coloured)',
+          col = c("#FFA040", "#008000"),
+          ellipse = TRUE,
+          point.lwd = 2, cex = 3)
+```
+
+```{r}
+plotIndiv(pca.imp,
+          comp         = c(1, 2),   # Specify PCs to plot
+          ind.names    = dat.imp$id,
+          group        = dat.imp$husbandry,
+          title        = 'PCA of kNN imputed data',
+          legend       = TRUE, 
+          legend.title = 'Husbandry (coloured)',
+          col = c("#FFA040", "#008000"),
+          ellipse = TRUE,
+          point.lwd = 2, cex = 3)
+```
+
+### Biplots
+
+```{r}
+biplot(pca.ori, 
+       group        = dat.ori.nonan$husbandry, 
+       ind.names    = dat.ori.nonan$id, # not Show row names of samples
+       legend       = TRUE, 
+       legend.title = 'Husbandry (coloured)',
+       col          = c("#FFA040", "#008000"))
+```
+
+```{r}
+biplot(pca.imp, 
+       group        = dat.imp$husbandry, 
+       ind.names    = dat.imp$id, # not Show row names of samples
+       legend       = TRUE, 
+       legend.title = 'Husbandry (coloured)',
+       col          = c("#FFA040", "#008000"))
+```
+
+### Loadings
+
+```{r}
+plotLoadings(pca.ori, comp = 1)
+plotLoadings(pca.ori, comp = 2)
+
+plotLoadings(pca.imp, comp = 1)
+plotLoadings(pca.imp, comp = 2)
+```
+
+## Plot loadings
+
+Prepare data frame:
+
+```{r}
+load.ori <- bind_cols(as_tibble(pca.ori$loadings$X),
+                      as_tibble(pca.ori$names$X)) |> 
+  rename(parameter = value) |> 
+  dplyr::select(parameter, PC1, PC2) |> 
+  pivot_longer(!parameter, names_to = "PCs", values_to = "loading") |> 
+  # make factors
+  mutate_at(vars(parameter,
+                 PCs) , ~as.factor(.)) |> 
+  group_by(PCs) |> 
+  slice_max(order_by = abs(loading), n = 5) |> 
+  ungroup() |> 
+  droplevels()
+
+# Change order of `PCs` factor levels
+load.ori$PCs <- factor(load.ori$PCs, levels = c("PC1", "PC2"))
+# Reorder `parameter` based on `PCs` (PC1 first, PC2 second)
+load.ori$parameter <- factor(load.ori$parameter, 
+                             levels = load.ori$parameter[order(load.ori$PCs)])
+```
+
+```{r}
+load.imp <- bind_cols(as_tibble(pca.imp$loadings$X),
+                      as_tibble(pca.imp$names$X)) |> 
+  rename(parameter = value) |> 
+  dplyr::select(parameter, PC1, PC2) |> 
+  pivot_longer(!parameter, names_to = "PCs", values_to = "loading") |> 
+  # make factors
+  mutate_at(vars(parameter,
+                 PCs) , ~as.factor(.)) |> 
+  group_by(PCs) |> 
+  slice_max(order_by = abs(loading), n = 5) |> 
+  ungroup() |> 
+  droplevels()
+
+# Change order of `PCs` factor levels
+load.imp$PCs <- factor(load.imp$PCs, levels = c("PC1", "PC2"))
+# Reorder `parameter` based on `PCs` (PC1 first, PC2 second)
+load.imp$parameter <- factor(load.imp$parameter, 
+                             levels = load.imp$parameter[order(load.imp$PCs)])
+```
+
+Loading plots:
+
+```{r}
+plot.load.ori <- load.ori |> 
+  ggplot(aes(x = parameter, y = loading, fill = PCs)) +
+  geom_bar(stat     = "identity", width = 0.7,
+           position = position_identity()) +
+  geom_vline(xintercept = 5.5) +
+  scale_fill_manual(values = c("PC1" = "dodgerblue", "PC2" = "dodgerblue4"),
+                    guide  = "none") +
+  scale_x_discrete(lim = rev) +
+  scale_y_continuous(lim = c(-0.5, 0.5), 
+                     breaks = seq(-0.5, 0.5, 0.1)) +
+  labs(x    = NULL, 
+       y    = "Loading", 
+       fill = NULL) +
+  geom_text(x = 1,  y = 0.4, label = "PC2", 
+            size = 16/.pt, color = "dodgerblue4") +
+  geom_text(x = 10, y = 0.4, label = "PC1", 
+            size = 16/.pt, color = "dodgerblue") +
+  my_theme_load +
+  theme(aspect.ratio = 0.6) +
+  coord_flip()
+```
+
+```{r}
+plot.load.imp <- load.imp |> 
+  ggplot(aes(x = parameter, y = loading, fill = PCs)) +
+  geom_bar(stat     = "identity", width = 0.7,
+           position = position_identity()) +
+  geom_vline(xintercept = 5.5) +
+  scale_fill_manual(values = c("PC1" = "dodgerblue", "PC2" = "dodgerblue4"), guide="none") +
+  scale_x_discrete(lim = rev) +
+  scale_y_continuous(lim = c(-0.5, 0.5), 
+                     breaks = seq(-0.5, 0.5, 0.1)) +
+  labs(x    = NULL, 
+       y    = "Loading", 
+       fill = NULL) +
+  geom_text(x = 1,  y = 0.4, label = "PC2", 
+            size = 16/.pt, color = "dodgerblue4") +
+  geom_text(x = 10, y = 0.4, label = "PC1", 
+            size = 16/.pt, color = "dodgerblue") +
+  my_theme_load +
+  theme(aspect.ratio = 0.6) +
+  coord_flip()
+```
+
+## Combined plots: Figure 7
+
+Convert plotIndiv() output to ggplot2 objects:
+
+```{r}
+plot.ori <- as.ggplot(~ plotIndiv(pca.ori,
+                                  comp         = c(1, 2),   # Specify PCs to plot
+                                  #ind.names    = dat.ori.nonan$id,
+                                  pch          = 16,
+                                  group        = dat.ori.nonan$husbandry,
+                                  title        = 'Original data',
+                                  X.label =c(expression(paste("PC 1 (28%)"))),
+                                  Y.label =c(expression(paste("PC 2 (23%)"))),
+                                  legend       = FALSE, 
+                                  legend.title = 'Husbandry',
+                                  col = c("#FFA040", "#008000"),
+                                  ellipse = TRUE,
+                                  ellipse.level = 0.90,
+                                  cex = 3,
+                                  size.title  = rel(1.1), 
+                                  size.label  = rel(1),
+                                  size.axis   = rel(0.8), 
+                                  size.legend = rel(1),
+                                  xlim = c(-6,6),
+                                  ylim = c(-6,6),
+                                  style = 'ggplot2'))+
+  theme(aspect.ratio = 1/1)
+```
+
+```{r}
+plot.imp <- as.ggplot(~ plotIndiv(pca.imp,
+                                  comp         = c(1, 2),   # Specify PCs to plot
+                                  #ind.names    = dat.imp$id,
+                                  pch          = 16,
+                                  group        = dat.imp$husbandry,
+                                  title        = 'Imputed data',
+                                  X.label =c(expression(paste("PC 1 (27%)"))),
+                                  Y.label =c(expression(paste("PC 2 (20%)"))),
+                                  legend       = FALSE, 
+                                  legend.title = 'Husbandry',
+                                  col = c("#FFA040", "#008000"),
+                                  ellipse = TRUE,
+                                  ellipse.level = 0.95,
+                                  cex = 3,
+                                  size.title  = rel(1.1), 
+                                  size.label  = rel(1), 
+                                  size.axis   = rel(0.8), 
+                                  size.legend = rel(1),
+                                  xlim = c(-6,6),
+                                  ylim = c(-6,6),
+                                  style = 'ggplot2'))+
+  theme(aspect.ratio = 1/1)
+```
+
+```{r}
+combined <- (free(plot.ori, side = "l") + 
+             free(plot.imp, side = "l") +
+             plot.load.ori + 
+             plot.load.imp) + 
+  plot_layout(heights = c(2, 1)) +
+  plot_annotation(tag_levels = 'A') &
+  theme(plot.tag = element_text(size = 16))
+```
+
+```{r, fig.height=20, fig.width=20, warning=FALSE}
+combined
+```
+
+```{r, eval = TRUE}
+png("./plots/figure7.png",
+     width = 300, height = 300, units = "mm",
+     pointsize = 10, res = 600)
+
+combined
+
+dev.off()
+```
+
+# Clustering
+
+## Run cluster analysis
+
+```{r}
+dist.imp <- dist(scale(var.imp, center = TRUE, scale = TRUE),
+                 method = "euclidean")
+
+hclust.imp <- hclust(dist.imp, 
+                     method = "ward.D2")
+
+dend.imp <- as.dendrogram(hclust.imp)
+```
+
+```{r}
+# simple dendrogram
+plot(hclust.imp, labels = dat.imp$husbandry)
+plot(hclust.imp, labels = dat.imp$id)
+```
+
+## Dendrogram
+
+### ID-labels
+
+```{r}
+# Reorder labels to match the dendrogram order
+ordered_labels <- dat.imp$id[order.dendrogram(dend.imp)]  
+# Assign correct labels to the dendrogram
+labels(dend.imp) <- ordered_labels
+
+label_colors <- c(rep("#008000", 4),
+                  rep("#FFA040", 3),
+                  rep("#008000", 6),
+                  rep("#FFA040", 1),
+                  rep("#008000", 2),
+                  rep("#FFA040", 1),
+                  rep("#008000", 8),
+                  rep("#FFA040", 15))
+```
+
+```{r, fig.height=20, fig.width=20, warning=FALSE}
+fviz_dend(dend.imp,
+          k = 2,  # Number of clusters
+          cex = 0.8,  # Adjust label size
+          rect = TRUE, 
+          rect_fill = TRUE, 
+          k_colors = c("grey20", "grey20"),  # Cluster colors
+          label_cols = label_colors,
+          label_tracks = TRUE,  # Show labels at branch ends
+          lwd = 1.2,
+          main = "") +
+  annotate("text", 
+           x = 9, y = 13, 
+           label = "Cluster 1", color = "#008000", size = 16/.pt) +
+  annotate("text", 
+           x = 35, y = 13, 
+           label = "Cluster 2", color = "#FFA040", size = 16/.pt) +
+  theme(text = element_text(family = "sans"),
+        plot.title   = element_text(face = "plain", size = 14),
+        axis.title   = element_text(face = "bold",  size = 14),
+        legend.title = element_text(face = "bold",  size = 18),
+        legend.text  = element_text(face = "bold",  size = 16),
+        axis.text    = element_text(size = 12, angle = 0, vjust = 0.5))
+```
+
+### Husbandry-labels
+
+```{r}
+# Reorder labels to match the dendrogram order
+ordered_labels <- dat.imp$husbandry[order.dendrogram(dend.imp)]  
+# Assign correct labels to the dendrogram
+labels(dend.imp) <- ordered_labels
+
+label_colors <- c(rep("#008000", 4),
+                  rep("#FFA040", 3),
+                  rep("#008000", 6),
+                  rep("#FFA040", 1),
+                  rep("#008000", 2),
+                  rep("#FFA040", 1),
+                  rep("#008000", 8),
+                  rep("#FFA040", 15))
+```
+
+```{r, fig.height=20, fig.width=20, warning=FALSE}
+fviz_dend(dend.imp,
+          k = 2,  # Number of clusters
+          cex = 0.8,  # Adjust label size
+          rect = TRUE, 
+          rect_fill = TRUE, 
+          k_colors = c("grey20", "grey20"),  # Cluster colors
+          label_cols = label_colors,
+          label_tracks = TRUE,  # Show labels at branch ends
+          lwd = 1.2,
+          main = "") +
+  annotate("text", 
+           x = 9, y = 13, 
+           label = "Cluster 1", color = "#008000", size = 16/.pt) +
+  annotate("text", 
+           x = 35, y = 13, 
+           label = "Cluster 2", color = "#FFA040", size = 16/.pt) +
+  theme(text = element_text(family = "sans"),
+        plot.title   = element_text(face = "plain", size = 14),
+        axis.title   = element_text(face = "bold",  size = 14),
+        legend.title = element_text(face = "bold",  size = 18),
+        legend.text  = element_text(face = "bold",  size = 16),
+        axis.text    = element_text(size = 12, angle = 0, vjust = 0.5))
+```
+
+```{r, eval = TRUE}
+png("./plots/figure8.png",
+     width = 200, height = 200, units = "mm",
+     pointsize = 10, res = 600)
+
+fviz_dend(dend.imp,
+          k = 2,  # Number of clusters
+          cex = 0.8,  # Adjust label size
+          rect = TRUE, 
+          rect_fill = TRUE, 
+          k_colors = c("grey20", "grey20"),  # Cluster colors
+          label_cols = label_colors,
+          label_tracks = TRUE,  # Show labels at branch ends
+          lwd = 1.2,
+          main = "") +
+  annotate("text", 
+           x = 9, y = 14, 
+           label = "Cluster 1", color = "#008000", size = 18/.pt) +
+  annotate("text", 
+           x = 36, y = 14, 
+           label = "Cluster 2", color = "#FFA040", size = 18/.pt) +
+  theme(text = element_text(family = "sans"),
+        plot.title   = element_text(face = "plain", size = 14),
+        axis.title   = element_text(face = "bold",  size = 14),
+        legend.title = element_text(face = "bold",  size = 18),
+        legend.text  = element_text(face = "bold",  size = 16),
+        axis.text    = element_text(size = 12, angle = 0, vjust = 0.5))
+
+dev.off()
+```
+
+## Further analysis of the two clusters
+
+```{r}
+# Cut the dendrogram into a specified number of clusters
+# For example, cutting into 2 clusters
+clusters <- cutree(hclust.imp, k = 2)
+
+# Add cluster assignments to your original data
+dat.imp$cluster <- as.factor(clusters)
+
+dat.imp <- dat.imp |> 
+  relocate(cluster) |> 
+  mutate(cluster = case_when(cluster == "1" ~ "Cluster 2", 
+                             TRUE ~ "Cluster 1"))
+```
+
+```{r}
+dat.imp.l <- dat.imp %>%
+  pivot_longer(
+    cols = -c(cluster:id),
+    names_to = c("parameter", "time"),
+    names_pattern = "(.*)\\.(\\d+dpc|\\d+dpp)",
+    values_to = "value.imp") |> 
+  mutate_at(vars(cluster,
+                 parameter,
+                 time) , ~as.factor(.)) |> 
+  arrange(cluster, id)
+```
+
+### Summary statistics
+
+```{r}
+dat.imp.l |> 
+  group_by(cluster, parameter) |> 
+  rstatix::get_summary_stats(value.imp, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |> 
+  arrange(parameter, cluster) |>
+  kable(caption = "Imputed data") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+### Standardized mean difference
+
+```{r}
+dat.imp.l |> 
+  mutate(cluster = as.factor(cluster)) |> 
+  group_by(parameter, time) |> 
+  summarise(smd = smd(value.imp, cluster)) |> 
+  ungroup()
+```
+
+## Plot
+
+```{r}
+# provide new labels as a named character vector:
+# New facet label names for parameter variable
+parameter.labs <- c("IGF bioactivity", "Cortisol (saliva)", "IGF1", "IGF2", "IGF BP2", "IGF BP3", "STC1")
+names(parameter.labs) <- c("bioact.ser", "cort.sal", "igf1.ser", "igf2.ser", "igfbp2.ser", "igfbp3.ser", "stc1" )
+
+# New facet label names for time variable
+time.labs <- c("30dpc", "105dpc", "8dpp")
+names(time.labs) <- c("30dpc", "105dpc", "8dpp")
+
+plot <- dat.imp.l |>  
+  mutate(time = fct_relevel(time, c("30dpc", "105dpc", "8dpp"))) |> 
+  mutate(husbandry = fct_relevel(husbandry, c("ecological", "conventional"))) |> 
+  # plot
+  ggplot(aes(x = cluster,
+             y = value.imp)) +
+  geom_boxplot(aes(fill = cluster),
+               position = position_dodge(width = 0.6), 
+               outlier.shape = NA, 
+               width = 0.3,
+               linewidth = 0.2,
+               col = "grey70",
+               alpha = 0.5) +
+  geom_jitter(aes(col = husbandry), 
+              position = position_jitterdodge(jitter.width = 0.1, 
+                                             dodge.width = 0.1), 
+              size = 2, alpha = 0.7) + 
+  scale_color_manual(values = c("#008000", "#FFA040"),
+                     labels = c("Ecological", "Conventional")) +
+  scale_fill_manual(values = c("#008000", "#FFA040"),
+                   labels = c("Cluster 1", "Cluster 2")) +
+  scale_x_discrete(labels = c("Cluster 1", "Cluster 2")) +
+  labs(x = "",
+       y = "",
+       col = "Husbandry",
+       fill = "Cluster") +
+  facet_grid(parameter ~ time, 
+             scales = "free_y",
+             labeller = labeller(parameter = parameter.labs,
+                                 time = time.labs)) +
+  my_theme +
+  theme(strip.text.y = element_text(angle = 0),
+        strip.text.x = element_text(face = "bold", size = 14),
+        legend.position = "bottom") +
+  guides(fill = guide_legend(override.aes = list(linetype = 0, size  = 5)),
+         col = guide_legend(override.aes = list(size  = 5)))
+```
+
+```{r, fig.height=10, fig.width=10, warning=FALSE}
+plot
+```
+
+```{r, eval = TRUE}
+png("./plots/cluster1-cluster2.png",
+     width = 450, height = 300, units = "mm",
+     pointsize = 10, res = 600)
+
+plot
+
+dev.off()
+```
+
+# How to cite R
+
+"All analyses were performed using R Statistical Software (version 4.4.2; R Core Team 2024)".
+
+Reference: R Core Team (2024). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+
+```{r, cite-r}
+citation()
+version$version.string
+```
+
+```{r, cite-packages}
+citation("tidyverse")
+citation("readxl")
+citation("kableExtra")
+citation("rstatix")
+citation("patchwork")
+citation("ggplotify")
+citation("mixOmics")
+citation("factoextra")
+citation("dendextend")
+citation("smd")
+```
+
+# Session Info
+
+```{r, session}
+sessionInfo()
+```

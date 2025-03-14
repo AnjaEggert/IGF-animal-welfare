@@ -1,0 +1,509 @@
+---
+title: "Summary stats (Igf & animal welfare)"
+author: "Anja Eggert & Anne-Marie Galow"
+date: "`r Sys.Date()`" 
+editor: visual
+code-fold: false
+toc: true
+format: html
+self-contained: true
+execute:
+  error: true   #  ignore error of code chunk and continue compiling html
+#bibliography: references.bib
+---
+
+# R Libraries
+
+```{r, libraries, warning=FALSE, message=FALSE, echo=TRUE}
+library(tidyverse)     # tidy universe
+library(readxl)        # read Excel files
+library(kableExtra)    # html-table
+library(rstatix)       # data summary
+```
+
+# Data
+
+## Read data
+
+```{r, read-data}
+dat <- read_xlsx("./data/data-matrix.xlsx",
+                 sheet = "data_ori",
+                 col_names = TRUE,
+                 na = c("", "n.A."),
+                 .name_repair = "universal")
+```
+
+## Data processing
+
+-   define several variables as factors
+-   add some columns: IGFBP2/IGFBP3, id column
+
+```{r, data-processing}
+dat.w <- dat |> 
+  # make factors
+  mutate_at(vars(husbandry,
+                 sow,
+                 boar,
+                 insem.group,
+                 litter.no) , ~as.factor(.)) |> 
+  # molar ratio: IGFBP2=33.937 Da, IGFBP3=31.690 Da
+  mutate(igfbp23.ser.105dpc = (igfbp2.ser.105dpc/33.937)/(igfbp3.ser.105dpc/31.690),
+         igfbp23.ser.8dpp   = (igfbp2.ser.8dpp/33.937)/(igfbp3.ser.8dpp/31.690))   |> 
+  # unique identifier is combination of sow and litter
+  mutate(id = as.factor(paste0(sow, ".", litter.no))) |> 
+  relocate(id, .after = litter.no) |> 
+  # remove 4 outliers
+  mutate(cort.ser.105dpc = case_when(id == "6738.1" ~ NA_real_, TRUE ~ cort.ser.105dpc),
+         cort.sal.105dpc = case_when(id == "6924.1" ~ NA_real_, TRUE ~ cort.sal.105dpc),
+         stc1.105dpc     = case_when(id == "6734.2" ~ NA_real_, TRUE ~ stc1.105dpc),
+         stc1.8dpp       = case_when(id == "6734.2" ~ NA_real_, TRUE ~ stc1.8dpp))
+```
+
+## Pivoting data table to long format
+
+- `names_pattern = "(.*)\\.(\\d+dpc|\\d+dpp)"`:
+- `(.*)`: Captures everything before the last period, which corresponds to the parameter (e.g., "cort.ser", "cort.sal", "bioact.ser")
+- `(\\d+dpc|\\d+dpp)`: Captures the time information (e.g., "105dpc", "8dpp", "30dpc").
+
+```{r, data-pivoting}
+dat.l <- dat.w %>%
+  pivot_longer(
+    cols = -c(husbandry:mean.bodyweight),
+    names_to = c("parameter", "time"),
+    names_pattern = "(.*)\\.(\\d+dpc|\\d+dpp)"
+  ) |> 
+  mutate_at(vars(parameter,
+                 time) , ~as.factor(.)) |> 
+  arrange(husbandry, parameter, time)
+```
+
+## Data structure
+
+Most sows have 3 litters, but a few only 2 or only 1 litter. *I.e.* we have a nested structure, but not balanced.
+
+```{r}
+table(dat.w$husbandry,dat.w$sow)
+```
+
+## Save processed data
+
+```{r}
+save(dat.w, dat.l, file = "./data/data-processed.RData")
+```
+
+# Basic features
+
+```{r}
+dat.w |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(insem.age : mean.bodyweight, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |> 
+  arrange(variable, husbandry) |>
+  kable(caption = "Basic features of litters depending on the husbandry system") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.w |> 
+  group_by(husbandry, litter.no) |> 
+  rstatix::get_summary_stats(insem.age : mean.bodyweight, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |> 
+  arrange(variable, husbandry) |>
+  kable(caption = "Basic features of litters depending on the husbandry system and litter number") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+## Occurrences of stillborns and spreizers within husbandry
+
+```{r}
+dat.w |> 
+  dplyr::select(husbandry, prop.stillborn, prop.spreizer) |> 
+  mutate(across(c(prop.stillborn, prop.spreizer), ~ as.numeric(. != 0))) |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(show = c("mean", "sd")) |> 
+  ungroup() |> 
+  arrange(variable, husbandry) |>
+  kable(caption = "Occurrences of stillborns and spreizers within husbandry") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "600px")
+```
+
+# Cortisol (serum)
+
+```{r}
+dat.l |> 
+  dplyr::filter(parameter == "cort.ser") |>
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |> 
+  arrange(variable, husbandry) |>
+  kable(caption = "Cortisol (serum) depending on the husbandry system") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "cort.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry, time) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |> 
+  arrange(variable, husbandry) |>
+  kable(caption = "Cortisol (serum) depending on the husbandry system and time point of sampling") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+# Cortisol (saliva)
+
+```{r}
+dat.l |> 
+  dplyr::filter(parameter == "cort.sal") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |> 
+  arrange(variable, husbandry) |>
+  kable(caption = "Cortisol (saliva) depending on the husbandry system") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "cort.sal") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry, time) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |> 
+  arrange(variable, husbandry) |>
+  kable(caption = "Cortisol (saliva) depending on the husbandry system and time point of sampling") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+# IGF bioactivity
+
+```{r}
+dat.l |> 
+  dplyr::filter(parameter == "bioact.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |> 
+  arrange(variable, husbandry) |>
+  kable(caption = "IGF bioactivity depending on the husbandry system") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "bioact.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry, time) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "IGF bioactivity depending on the husbandry system and time point of sampling") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "bioact.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry, time, litter.no) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |> 
+  arrange(variable, husbandry) |>
+  kable(caption = "IGF bioactivity depending on the husbandry system and time point of sampling and littern number") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+# IGF1 (serum)
+
+```{r}
+dat.l |> 
+  dplyr::filter(parameter == "igf1.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "IGF1 (serum) depending on the husbandry system") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "igf1.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry, time) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "IGF1 (serum) depending on the husbandry system and time point of sampling") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+# IGF2 (serum)
+
+```{r}
+dat.l |> 
+  dplyr::filter(parameter == "igf2.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "IGF2 (serum) depending on the husbandry system") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "igf2.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry, time) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "IGF2 (serum) depending on the husbandry system and time point of sampling") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+# IGFBP2 (serum)
+
+```{r}
+dat.l |> 
+  dplyr::filter(parameter == "igfbp2.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "IGFBP2 (serum) depending on the husbandry system") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "igfbp2.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry, time) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "IGFBP2 (serum) depending on the husbandry system and time point of sampling") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+# IGFBP3 (serum)
+
+```{r}
+dat.l |> 
+  dplyr::filter(parameter == "igfbp3.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "IGFBP3 (serum) depending on the husbandry system") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "igfbp3.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry, time) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "IGFBP3 (serum) depending on the husbandry system and time point of sampling") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+# IGFBP2/IGFBP3 (molar ratio, serum)
+
+```{r}
+dat.l |> 
+  dplyr::filter(parameter == "igfbp23.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "Molar ratio IGFBP2/IGFBP3 (serum) depending on the husbandry system") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "igfbp23.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry, time) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "Molar ratio IGFBP2/IGFBP3 (serum) depending on the husbandry system and time point of sampling") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+# Proteolytic activity (serum)
+
+```{r}
+dat.l |> 
+  dplyr::filter(parameter == "proteolysis") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  kable(caption = "Proteolytic activity") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "proteolysis") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "Proteolytic activity depending on the husbandry system") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "proteolysis") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry, time) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "Proteolytic activity depending on the husbandry system and time point of sampling") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+# Stanniocalcin, STC1 (serum)
+
+```{r}
+dat.l |> 
+  dplyr::filter(parameter == "stc1") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "STC1 (serum) depending on the husbandry system") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "stc1") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry, time) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>  
+  arrange(variable, husbandry) |>
+  kable(caption = "STC1 (serum) depending on the husbandry system and time point of sampling") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+# Calcium (serum)
+
+```{r}
+dat.l |> 
+  dplyr::filter(parameter == "calc") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>
+  arrange(variable, husbandry) |>
+  kable(caption = "Calcium (serum) depending on the husbandry system") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+
+dat.l |> 
+  dplyr::filter(parameter == "calc") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  group_by(husbandry, time) |> 
+  rstatix::get_summary_stats(value, show = c("min", "max", "mean", "sd", "median", "q1", "q3")) |> 
+  ungroup() |>
+  arrange(variable, husbandry) |>
+  kable(caption = "Calcium (serum) depending on the husbandry system and time point of sampling") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 8) |> 
+  scroll_box(width = "800px")
+```
+
+# How to cite R
+
+"All analyses were performed using R Statistical Software (version 4.4.2; R Core Team 2024)".
+
+Reference: R Core Team (2024). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+
+```{r, cite-r}
+citation()
+version$version.string
+```
+
+```{r, cite-packages}
+citation("tidyverse")
+citation("readxl")
+citation("kableExtra")
+citation("rstatix")
+```
+
+# Session Info
+
+```{r, session}
+sessionInfo()
+```

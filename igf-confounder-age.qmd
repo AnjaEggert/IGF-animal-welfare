@@ -1,0 +1,976 @@
+---
+title: "Confounder age (Igf & animal welfare)"
+author: "Anja Eggert & Anne-Marie Galow"
+date: "`r Sys.Date()`" 
+editor: visual
+code-fold: false
+toc: true
+format: html
+self-contained: true
+execute:
+  error: true   #  ignore error of code chunk and continue compiling html
+#bibliography: references.bib
+---
+
+# R Libraries
+
+```{r, libraries, warning=FALSE, message=FALSE, echo=TRUE}
+library(tidyverse)     # tidy universe
+library(kableExtra)    # html-table
+library(patchwork)     # combine plots
+library(lmerTest)      # mixed model
+library(car)           # ANOVA
+library(performance)   # model performance
+```
+
+```{r, my_theme, echo = FALSE}
+my_theme = theme_classic() +
+  theme(text = element_text(family = "sans"),
+        plot.title   = element_text(face = "plain", size = 16),
+        axis.title   = element_text(face = "bold",  size = 18),
+        legend.title = element_text(face = "plain", size = 16),  
+        legend.text  = element_text(face = "plain", size = 16),
+        axis.text    = element_text(face = "bold",  size = 16, 
+                                    angle = 0, vjust = 0.5),
+        panel.grid.major.x      = element_blank(),
+        panel.grid.major.y      = element_line(color = "gray", 
+                                               linewidth = 0.5, 
+                                               linetype = "dotted"),
+        panel.grid.minor        = element_blank(),
+        axis.ticks.length       = unit(5, "pt"),
+        axis.minor.ticks.length = rel(0.5))
+```
+
+```{r, seed}
+set.seed(1989)
+```
+
+# Data
+
+## Read data
+
+Data processing done in file "igf-biomarker-summary-stats.qmd".
+
+```{r, read-data}
+load("./data/data-processed.RData")
+```
+
+# Statistical model: general design
+
+With a simple model structure we solely test for a confounder effect of insemination age. We include a random animal effect and also the nested structure. Each sow gave birth 1, 2 or 3 times, so these events are nested within sows. We fit a linear mixed model with the `lmerTest` package in R.
+
+```{r}
+contr = lmerControl(optimizer   = "bobyqa",
+                    optCtrl     = list(maxfun = 10000000),
+                    calc.derivs = FALSE)
+```
+
+# Cortisol serum
+
+## Model
+
+```{r}
+mod.cort1 <- lmerTest::lmer(log(value) ~ 
+                              insem.age +
+                              # random intercept for sows and for each litter within sow
+                              (1 | sow/litter.no),
+                            data    = dat.l |> 
+                              dplyr::filter(parameter == "cort.ser") |> 
+                              droplevels() |>
+                              drop_na(value),
+                            REML    = TRUE,
+                            control = contr)
+```
+
+```{r}
+summary(mod.cort1)
+```
+
+```{r}
+round(drop1(mod.cort1, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.cort1,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.cort1,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.cort1)
+```
+
+## Plot
+
+```{r}
+plot.cort1 <- dat.l  |> 
+  dplyr::filter(parameter == "cort.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(insem.age), 10)) |>  
+  ggplot(aes(y   = value)) +
+  geom_point(aes(x   = jit, 
+                 col = husbandry, 
+                 shape = time),
+             size = 3) +
+  scale_colour_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 60), 
+                     breaks = seq(0, 60, 20),
+                     minor_breaks = seq(0, 60, by = 2) ) +
+  labs(x = "Insemination age of the sows [days]",
+       y = "Cortisol (serum) [ng/ml]",
+       col = "Husbandry",
+       shape = "Time") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         col = guide_legend(override.aes = list(size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.cort1
+```
+
+# Cortisol saliva
+
+## Model
+
+```{r}
+mod.cort2 <- lmerTest::lmer(log(value) ~ 
+                              insem.age +
+                              # random intercept for sows and for each litter within sow
+                              (1 | sow/litter.no),
+                            data    = dat.l |> 
+                              dplyr::filter(parameter == "cort.sal") |> 
+                              droplevels() |>
+                              drop_na(value),
+                            REML    = TRUE,
+                            control = contr)
+```
+
+```{r}
+summary(mod.cort2)
+```
+
+```{r}
+round(drop1(mod.cort2, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.cort2,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.cort2,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.cort2)
+```
+
+## Plot
+
+```{r}
+plot.cort2 <- dat.l  |> 
+  dplyr::filter(parameter == "cort.sal") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(insem.age), 10)) |>  
+  ggplot(aes(y   = value)) +
+  geom_point(aes(x   = jit, 
+                 col = husbandry, 
+                 shape = time),
+             size = 3) +
+  scale_colour_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 30), 
+                     breaks = seq(0, 30, 10),
+                     minor_breaks = seq(0, 30, by = 2) ) +
+  labs(x = "Insemination age of the sows [days]",
+       y = "Cortisol (saliva) [ng/ml]",
+       col = "Husbandry",
+       shape = "Time") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         col = guide_legend(override.aes = list(size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.cort2
+```
+
+# IGF bioactivity
+
+## Model
+
+```{r}
+mod.bioact <- lmerTest::lmer(log(value) ~ 
+                               insem.age +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                               dplyr::filter(parameter == "bioact.ser") |> 
+                               drop_na(value) |> 
+                               dplyr::filter(time != "30dpc") |> 
+                               droplevels(),
+                            REML    = TRUE,
+                            control = contr)
+```
+
+```{r}
+summary(mod.bioact)
+```
+
+```{r}
+round(drop1(mod.bioact, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.bioact,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.bioact,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.bioact)
+```
+
+## Plot
+
+```{r}
+plot.bioact <- dat.l  |> 
+  dplyr::filter(parameter == "bioact.ser") |> 
+  drop_na(value) |> 
+  dplyr::filter(time != "30dpc") |> 
+  droplevels() |>
+  # make plot
+  mutate(jit = jitter(as.numeric(insem.age), 10)) |>  
+  ggplot(aes(y   = value)) +
+  geom_point(aes(x   = jit, 
+                 col = husbandry, 
+                 shape = time),
+             size = 3) +
+  scale_colour_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 600), 
+                     breaks = seq(0, 600, 200),
+                     minor_breaks = seq(0, 600, by = 50) ) +
+  labs(x = "Insemination age of the sows [days]",
+       y = "IGF bioactivity [ng/ml]",
+       col = "Husbandry",
+       shape = "Time") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         col = guide_legend(override.aes = list(size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.bioact
+```
+
+# IGF1 (serum)
+
+## Model
+
+```{r}
+mod.igf1 <- lmerTest::lmer(log(value) ~ 
+                              insem.age +
+                              # random intercept for sows and for each litter within sow
+                              (1 | sow/litter.no),
+                            data    = dat.l |> 
+                              dplyr::filter(parameter == "igf1.ser") |> 
+                              droplevels() |>
+                              drop_na(value),
+                            REML    = TRUE,
+                            control = contr)
+```
+
+```{r}
+summary(mod.igf1)
+```
+
+```{r}
+round(drop1(mod.igf1, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.igf1,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.igf1,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.igf1)
+```
+
+## Plot
+
+```{r}
+plot.igf1 <- dat.l  |> 
+  dplyr::filter(parameter == "igf1.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(insem.age), 10)) |>  
+  ggplot(aes(y   = value)) +
+  geom_point(aes(x   = jit, 
+                 col = husbandry, 
+                 shape = time),
+             size = 3) +
+  scale_colour_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 500), 
+                     breaks = seq(0, 500, 100),
+                     minor_breaks = seq(0, 500, by = 20) ) +
+  labs(x = "Insemination age of the sows [days]",
+       y = "IGF1 (serum) [ng/ml]",
+       col = "Husbandry",
+       shape = "Time") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         col = guide_legend(override.aes = list(size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.igf1
+```
+
+# IGF2 (serum)
+
+## Model
+
+```{r}
+mod.igf2 <- lmerTest::lmer(log(value) ~ 
+                              insem.age +
+                              # random intercept for sows and for each litter within sow
+                              (1 | sow/litter.no),
+                            data    = dat.l |> 
+                              dplyr::filter(parameter == "igf2.ser") |> 
+                              droplevels() |> 
+                              drop_na(value),
+                            REML    = TRUE,
+                            control = contr)
+```
+
+```{r}
+summary(mod.igf2)
+```
+
+```{r}
+round(drop1(mod.igf2, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.igf2,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.igf2,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.igf2)
+```
+
+## Plot
+
+```{r}
+plot.igf2 <- dat.l  |> 
+  dplyr::filter(parameter == "igf2.ser") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(insem.age), 10)) |>  
+  ggplot(aes(y   = value)) +
+  geom_point(aes(x   = jit, 
+                 col = husbandry, 
+                 shape = time),
+             size = 3) +
+  scale_colour_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 200), 
+                     breaks = seq(0, 200, 50),
+                     minor_breaks = seq(0, 200, by = 10) ) +
+  labs(x = "Insemination age of the sows [days]",
+       y = "IGF2 (serum) [ng/ml]",
+       col = "Husbandry",
+       shape = "Time") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         col = guide_legend(override.aes = list(size  = 5)))
+
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.igf2
+```
+
+# IGFBP2 (serum)
+
+## Model
+
+```{r}
+mod.igfbp2 <- lmerTest::lmer(log(value) ~ 
+                               insem.age +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                               dplyr::filter(parameter == "igfbp2.ser") |> 
+                               droplevels() |> 
+                               drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.igfbp2)
+```
+
+```{r}
+round(drop1(mod.igfbp2, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.igfbp2,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.igfbp2,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.igfbp2)
+```
+
+## Plot
+
+```{r}
+plot.igfbp2 <- dat.l  |> 
+  dplyr::filter(parameter == "igfbp2.ser") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(insem.age), 10)) |>  
+  ggplot(aes(y   = value)) +
+  geom_point(aes(x   = jit, 
+                 col = husbandry, 
+                 shape = time),
+             size = 3) +
+  scale_colour_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 1250), 
+                     breaks = seq(0, 1250, 250),
+                     minor_breaks = seq(0, 1250, by = 100) ) +
+  labs(x = "Insemination age of the sows [days]",
+       y = "IGFBP2 (serum) [ng/ml]",
+       col = "Husbandry",
+       shape = "Time") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         col = guide_legend(override.aes = list(size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.igfbp2
+```
+
+# IGFBP3 (serum)
+
+## Model
+
+```{r}
+mod.igfbp3 <- lmerTest::lmer(log(value) ~ 
+                               insem.age +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                               dplyr::filter(parameter == "igfbp3.ser") |> 
+                               droplevels() |> 
+                               drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.igfbp3)
+```
+
+```{r}
+round(drop1(mod.igfbp3, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.igfbp3,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.igfbp3,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.igfbp3)
+```
+
+## Plot
+
+```{r}
+plot.igfbp3 <- dat.l  |> 
+  dplyr::filter(parameter == "igfbp3.ser") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(insem.age), 10)) |>  
+  ggplot(aes(y   = value)) +
+  geom_point(aes(x   = jit, 
+                 col = husbandry, 
+                 shape = time),
+             size = 3) +
+  scale_colour_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 6500), 
+                     breaks = seq(0, 6500, 2000),
+                     minor_breaks = seq(0, 6500, by = 200) ) +
+  labs(x = "Insemination age of the sows [days]",
+       y = "IGFBP3 (serum) [ng/ml]",
+       col = "Husbandry",
+       shape = "Time") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         col = guide_legend(override.aes = list(size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.igfbp3
+```
+
+# IGFBP2/IGFBP3 (serum)
+
+## Model
+
+```{r}
+mod.igfbp23 <- lmerTest::lmer(log(value) ~ 
+                               insem.age +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                               dplyr::filter(parameter == "igfbp23.ser") |> 
+                               droplevels() |>
+                               drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.igfbp23)
+```
+
+```{r}
+round(drop1(mod.igfbp23, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.igfbp23,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.igfbp2_3,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.igfbp23)
+```
+
+## Plot
+
+```{r}
+plot.igfbp23 <- dat.l  |> 
+  dplyr::filter(parameter == "igfbp23.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(insem.age), 10)) |>  
+  ggplot(aes(y   = value)) +
+  geom_point(aes(x   = jit, 
+                 col = husbandry, 
+                 shape = time),
+             size = 3) +
+  scale_colour_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 2.5), 
+                     breaks = seq(0, 2.5, 0.5),
+                     minor_breaks = seq(0, 2.5, by = 0.1) ) +
+  labs(x = "Insemination age of the sows [days]",
+       y = "Molar ratio IGFBP2/IGFBP3 (serum)",
+       col = "Husbandry",
+       shape = "Time") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         col = guide_legend(override.aes = list(size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.igfbp23
+```
+
+# Proteolytic activity (serum)
+
+## Model
+
+```{r}
+mod.prot <- lmerTest::lmer(log(value+1) ~ 
+                               insem.age +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                              dplyr::filter(parameter == "proteolysis") |> 
+                              droplevels() |> 
+                              drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.prot)
+```
+
+```{r}
+round(drop1(mod.prot, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.prot,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.prot,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.prot)
+```
+
+## Plot
+
+```{r}
+plot.prot <- dat.l  |> 
+  dplyr::filter(parameter == "proteolysis") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(insem.age), 10)) |>  
+  ggplot(aes(y   = value)) +
+  geom_point(aes(x   = jit, 
+                 col = husbandry, 
+                 shape = time),
+             size = 3) +
+  scale_colour_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 21), 
+                     breaks = seq(0, 21, 5),
+                     minor_breaks = seq(0, 21, by = 1) ) +
+  labs(x = "Insemination age of the sows [days]",
+       y = "Proteolytic activity (serum) [%]",
+       col = "Husbandry",
+       shape = "Time") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         col = guide_legend(override.aes = list(size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.prot
+```
+
+# Stanniocalcin, STC1 (serum)
+
+## Model
+
+```{r}
+mod.stc1 <- lmerTest::lmer(log(value) ~ 
+                               insem.age +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                               dplyr::filter(parameter == "stc1") |> 
+                               droplevels() |> 
+                               drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.stc1)
+```
+
+```{r}
+round(drop1(mod.stc1, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.stc1,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.stc1,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.stc1)
+```
+
+## Plot
+
+```{r}
+plot.stc1 <- dat.l  |> 
+  dplyr::filter(parameter == "stc1") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(insem.age), 10)) |>  
+  ggplot(aes(y   = value)) +
+  geom_point(aes(x   = jit, 
+                 col = husbandry, 
+                 shape = time),
+             size = 3) +
+  scale_colour_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 10000), 
+                     breaks = seq(0, 10000, 2000),
+                     minor_breaks = seq(0, 10000, by = 400) ) +
+  labs(x = "Insemination age of the sows [days]",
+       y = "STC1 (serum) [ng/ml]",
+       col = "Husbandry",
+       shape = "Time") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         col = guide_legend(override.aes = list(size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.stc1
+```
+
+# Calcium (serum)
+
+## Model
+
+```{r}
+mod.calc <- lmerTest::lmer(log(value) ~ 
+                               insem.age +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                               dplyr::filter(parameter == "calc") |> 
+                               dplyr::filter(time != "30dpc") |> 
+                               droplevels() |> 
+                               drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.calc)
+```
+
+```{r}
+round(drop1(mod.calc, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.calc,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.calc,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.calc)
+```
+
+## Plot
+
+```{r}
+plot.calc <- dat.l  |> 
+  dplyr::filter(parameter == "calc") |> 
+  dplyr::filter(time != "30dpc") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(insem.age), 10)) |>  
+  ggplot(aes(y   = value)) +
+  geom_point(aes(x   = jit, 
+                 col = husbandry, 
+                 shape = time),
+             size = 3) +
+  scale_colour_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 21), 
+                     breaks = seq(0, 20, 5),
+                     minor_breaks = seq(0, 20, by = 2) ) +
+  labs(x = "Insemination age of the sows [days]",
+       y = "Calcium (serum) [mg/dl]",
+       col = "Husbandry",
+       shape = "Time") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         col = guide_legend(override.aes = list(size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.calc
+```
+
+# Combined plots: Figure
+
+```{r}
+# Combine plots with a designated area for the legend
+combined <- (plot.cort1   +
+             plot.cort2   +
+             plot.bioact  +
+             plot.igf1    +
+             plot.igf2    +
+             plot.igfbp2  +
+             plot.igfbp3  +
+             plot.igfbp23 +
+             plot.prot    +
+             plot.stc1    +
+             plot.calc    +
+             guide_area()) + 
+  plot_layout(guides = "collect") +
+  plot_annotation(tag_levels = 'A') &
+  theme(plot.tag = element_text(face = "bold", size = 20),
+        legend.position = "right",
+        legend.direction = "vertical")
+```
+
+```{r, fig.height=20, fig.width=20, warning=FALSE}
+combined
+```
+
+```{r, eval = TRUE}
+png("./plots/figure-age.png",
+     width = 600, height = 500, units = "mm",
+     pointsize = 10, res = 600)
+
+combined
+
+dev.off()
+```
+
+# How to cite R
+
+"All analyses were performed using R Statistical Software (version 4.4.2; R Core Team 2024)".
+
+Reference: R Core Team (2024). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+
+```{r, cite-r}
+citation()
+version$version.string
+```
+
+```{r, cite-packages}
+citation("performance")
+```
+
+# Session Info
+
+```{r, session}
+sessionInfo()
+```

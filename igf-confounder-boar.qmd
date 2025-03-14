@@ -1,0 +1,652 @@
+---
+title: "Confounder boar (Igf & animal welfare)"
+author: "Anja Eggert & Anne-Marie Galow"
+date: "`r Sys.Date()`" 
+editor: visual
+code-fold: false
+toc: true
+format: html
+self-contained: true
+execute:
+  error: true   #  ignore error of code chunk and continue compiling html
+#bibliography: references.bib
+---
+
+# R Libraries
+
+```{r, libraries, warning=FALSE, message=FALSE, echo=TRUE}
+library(tidyverse)     # tidy universe
+library(patchwork)     # combine plots
+library(lmerTest)      # mixed model
+library(car)           # ANOVA
+library(emmeans)       # post hoc
+library(performance)   # model performance
+```
+
+```{r, my_theme, echo = FALSE}
+my_theme = theme_classic() +
+  theme(text = element_text(family = "sans"),
+        plot.title   = element_text(face = "plain", size = 16),
+        axis.title   = element_text(face = "bold",  size = 18),
+        legend.title = element_text(face = "plain", size = 16),  
+        legend.text  = element_text(face = "plain", size = 16),
+        axis.text    = element_text(face = "bold",  size = 16, 
+                                    angle = 90, vjust = 0.5),
+        panel.grid.major.x      = element_blank(),
+        panel.grid.major.y      = element_line(color = "gray", 
+                                               linewidth = 0.5, 
+                                               linetype = "dotted"),
+        panel.grid.minor        = element_blank(),
+        axis.ticks.length       = unit(5, "pt"),
+        axis.minor.ticks.length = rel(0.5))
+```
+
+```{r, seed}
+set.seed(1989)
+```
+
+# Data
+
+## Read data
+
+Data processing done in file "igf-biomarker-summary-stats.qmd".
+
+```{r, read-data}
+load("./data/data-processed.RData")
+```
+
+```{r}
+table(dat.w$husbandry, dat.w$boar)
+```
+
+
+# Statistical model: general design
+
+With a simple model structure we solely test for a confounder effect of the boars. We include a random animal effect and fit a linear mixed model with the `lmerTest` package in R.
+
+```{r}
+contr = lmerControl(optimizer   = "bobyqa",
+                    optCtrl     = list(maxfun = 10000000),
+                    calc.derivs = FALSE)
+```
+
+# Birth weight
+
+## Model
+
+```{r}
+hist(dat.w$mean.bodyweight,
+     breaks = 30)
+```
+
+```{r}
+mod.bodyweight <- lmerTest::lmer(mean.bodyweight ~ 
+                                   boar +
+                                   # random intercept for sows
+                                   (1 | sow),
+                                 data    = dat.w,
+                                 REML    = TRUE,
+                                 control = contr)
+```
+
+```{r}
+summary(mod.bodyweight)
+```
+
+```{r}
+round(drop1(mod.bodyweight, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.bodyweight,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.bodyweight,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.bodyweight)
+```
+
+## Plot
+
+```{r}
+plot.bodyweight <- dat.w  |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(boar), 0.3)) |>  
+  ggplot(aes(y   = mean.bodyweight)) +
+  geom_boxplot(aes(x   = boar, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = boar,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 2), 
+                     breaks = seq(0, 2, 0.5),
+                     minor_breaks = seq(0, 2, by = 0.1) ) +
+  labs(x = "",
+       y = "Mean birth weight [kg]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.bodyweight
+```
+
+# Total piglets
+
+## Model
+
+```{r}
+hist(dat.w$total.piglets,
+     breaks = 30)
+```
+
+```{r}
+mod.piglets <- lmerTest::lmer(total.piglets ~ 
+                                   boar +
+                                   # random intercept for sows
+                                   (1 | sow),
+                                 data    = dat.w,
+                                 REML    = TRUE,
+                                 control = contr)
+```
+
+```{r}
+summary(mod.piglets)
+```
+
+```{r}
+round(drop1(mod.piglets, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.piglets,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.piglets,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.piglets)
+```
+
+## Plot
+
+```{r}
+plot.piglets <- dat.w  |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(boar), 0.3)) |>  
+  ggplot(aes(y   = total.piglets)) +
+  geom_boxplot(aes(x   = boar, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = boar,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 22), 
+                     breaks = seq(0, 22, 5),
+                     minor_breaks = seq(0, 22, by = 1) ) +
+  labs(x = "",
+       y = "Number of piglets",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.piglets
+```
+
+# Proportion males
+
+## Model
+
+```{r}
+hist(dat.w$prop.males,
+     breaks = 30)
+```
+
+```{r}
+mod.males <- lmerTest::lmer(prop.males ~ 
+                                   boar +
+                                   # random intercept for sows
+                                   (1 | sow),
+                                 data    = dat.w,
+                                 REML    = TRUE,
+                                 control = contr)
+```
+
+```{r}
+summary(mod.males)
+```
+
+```{r}
+round(drop1(mod.males, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.males,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.males,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.males)
+```
+
+## Plot
+
+```{r}
+plot.males <- dat.w  |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(boar), 0.3)) |>  
+  ggplot(aes(y   = prop.males)) +
+  geom_boxplot(aes(x   = boar, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = boar,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 80), 
+                     breaks = seq(0, 80, 20),
+                     minor_breaks = seq(0, 80, by = 5) ) +
+  labs(x = "",
+       y = "Proportion males [%]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.males
+```
+
+# Proportion stillborn
+
+## Model
+
+```{r}
+hist(dat.w$prop.stillborn,
+     breaks = 30)
+
+hist(log(dat.w$prop.stillborn+1),
+     breaks = 30)
+```
+
+```{r}
+mod.stillborn <- lmerTest::lmer(log(dat.w$prop.stillborn+1) ~ 
+                                   boar +
+                                   # random intercept for sows
+                                   (1 | sow),
+                                 data    = dat.w,
+                                 REML    = TRUE,
+                                 control = contr)
+```
+
+```{r}
+summary(mod.stillborn)
+```
+
+```{r}
+round(drop1(mod.stillborn, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.stillborn,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.stillborn,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.stillborn)
+```
+
+## Plot
+
+```{r}
+plot.stillborn <- dat.w  |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(boar), 0.3)) |>  
+  ggplot(aes(y   = prop.stillborn)) +
+  geom_boxplot(aes(x   = boar, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = boar,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 40), 
+                     breaks = seq(0, 40, 10),
+                     minor_breaks = seq(0, 40, by = 2) ) +
+  labs(x = "",
+       y = "Proportion stillborn [%]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.stillborn
+```
+
+# Proportion spreizer
+
+## Model
+
+```{r}
+hist(dat.w$prop.spreizer,
+     breaks = 30)
+
+hist(log(dat.w$prop.spreizer+1),
+     breaks = 30)
+```
+
+```{r}
+mod.spreizer <- lmerTest::lmer(log(dat.w$prop.spreizer+1) ~ 
+                                   boar +
+                                   # random intercept for sows
+                                   (1 | sow),
+                                 data    = dat.w,
+                                 REML    = TRUE,
+                                 control = contr)
+```
+
+```{r}
+summary(mod.spreizer)
+```
+
+```{r}
+round(drop1(mod.spreizer, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.spreizer,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.spreizer,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.spreizer)
+```
+
+## Emmeans & Effect sizes
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.spreizer,
+        pairwise ~ boar, 
+        data    = dat.w, 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.spreizer),
+         edf = df.residual(mod.spreizer))
+```
+
+## Plot
+
+```{r}
+plot.spreizer <- dat.w  |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(boar), 0.3)) |>  
+  ggplot(aes(y   = prop.spreizer)) +
+  geom_boxplot(aes(x   = boar, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = boar,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 20), 
+                     breaks = seq(0, 20, 5),
+                     minor_breaks = seq(0, 20, by = 1) ) +
+  labs(x = "",
+       y = "Proportion spreizer [%]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.spreizer
+```
+
+# Proportion low body weight
+
+## Model
+
+```{r}
+hist(dat.w$prop.lbw,
+     breaks = 30)
+
+hist(log(dat.w$prop.lbw+1),
+     breaks = 30)
+```
+
+```{r}
+mod.lbw <- lmerTest::lmer(log(dat.w$prop.lbw+1) ~ 
+                                   boar +
+                                   # random intercept for sows
+                                   (1 | sow),
+                                 data    = dat.w,
+                                 REML    = TRUE,
+                                 control = contr)
+```
+
+```{r}
+summary(mod.lbw)
+```
+
+```{r}
+round(drop1(mod.lbw, test = 'Chisq'), 3)
+```
+
+```{r}
+car::Anova(mod.lbw,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.lbw,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.lbw)
+```
+
+## Plot
+
+```{r}
+plot.lbw <- dat.w  |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(boar), 0.3)) |>  
+  ggplot(aes(y   = prop.lbw)) +
+  geom_boxplot(aes(x   = boar, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = boar,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 82), 
+                     breaks = seq(0, 82, 20),
+                     minor_breaks = seq(0, 82, by = 5) ) +
+  labs(x = "",
+       y = "Proportion LBW [%]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.lbw
+```
+
+# Combined plots: Figure
+
+```{r}
+# Combine plots with a designated area for the legend
+combined <- (plot.bodyweight + 
+             plot.piglets + 
+             guide_area() + 
+             plot.males + 
+             plot.stillborn+
+             plot.spreizer) + 
+  plot_layout(guides = "collect") +
+  plot_annotation(tag_levels = 'A') &
+  theme(plot.tag = element_text(face = "bold", size = 20),
+        legend.position = "right",
+        legend.direction = "vertical")
+```
+
+```{r, fig.height=20, fig.width=20, warning=FALSE}
+combined
+```
+
+```{r, eval = TRUE}
+png("./plots/figure-boar.png",
+     width = 400, height = 300, units = "mm",
+     pointsize = 10, res = 600)
+
+combined
+
+dev.off()
+```
+
+# How to cite R
+
+"All analyses were performed using R Statistical Software (version 4.4.2; R Core Team 2024)".
+
+Reference: R Core Team (2024). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+
+```{r, cite-r}
+citation()
+version$version.string
+```
+
+```{r, cite-packages}
+citation("tidyverse")
+citation("patchwork")
+citation("lmerTest")
+citation("car")
+citation("emmeans")
+citation("performance")
+```
+
+# Session Info
+
+```{r, session}
+sessionInfo()
+```

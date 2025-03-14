@@ -1,0 +1,2764 @@
+---
+title: "Correlations + Mixed models (Igf & animal welfare)"
+author: "Anja Eggert & Anne-Marie Galow"
+date: "`r Sys.Date()`" 
+editor: visual
+code-fold: false
+toc: true
+format: html
+self-contained: true
+execute:
+  error: true   #  ignore error of code chunk and continue compiling html
+#bibliography: references.bib
+---
+
+# R Libraries
+
+```{r, libraries, warning=FALSE, message=FALSE, echo=TRUE}
+library(tidyverse)     # tidy universe
+library(kableExtra)    # html-table
+library(patchwork)     # combine plots
+library(lmerTest)      # mixed model
+library(car)           # ANOVA
+library(emmeans)       # post-hoc
+library(performance)   # model performance
+library(Hmisc)         # Computes correlation and p-value matrix
+library(viridis)       # colour scale
+```
+
+```{r, my_theme, echo = FALSE}
+my_theme = theme_classic() +
+  theme(text = element_text(family = "sans"),
+        plot.title   = element_text(face = "plain", size = 16),
+        axis.title   = element_text(face = "bold",  size = 18),
+        legend.title = element_text(face = "plain", size = 16),  
+        legend.text  = element_text(face = "plain", size = 16),
+        axis.text    = element_text(face = "bold",  size = 16, 
+                                    angle = 0, vjust = 0.5),
+        panel.grid.major.x      = element_blank(),
+        panel.grid.major.y      = element_line(color = "gray", 
+                                               linewidth = 0.5, 
+                                               linetype = "dotted"),
+        panel.grid.minor        = element_blank(),
+        axis.ticks.length       = unit(5, "pt"),
+        axis.minor.ticks.length = rel(0.5))
+
+my_theme_cor = theme_minimal() +
+  theme(text = element_text(family = "sans"),
+        plot.title   = element_text(face = "plain", size = 16),
+        axis.title   = element_text(face = "bold",  size = 16),
+        legend.title = element_text(face = "plain", size = 16),  
+        legend.text  = element_text(face = "plain", size = 16),
+        axis.text    = element_text(face = "bold",  size = 14, 
+                                    angle = 0, vjust = 0.5),
+        panel.grid.major        = element_blank(),
+        panel.grid.minor        = element_blank(),
+        axis.ticks.length       = unit(5, "pt"),
+        axis.minor.ticks.length = rel(0.5))
+```
+
+```{r, seed}
+set.seed(1989)
+```
+
+# Data
+
+## Read data
+
+Data processing done in file "igf-biomarker-summary-stats.qmd".
+
+```{r, read-data}
+load("./data/data-processed.RData")
+```
+
+# Correlations of parameters
+
+## All pairwise correlations
+
+```{r}
+dat.cor.all <- dat.w |> 
+  dplyr::select(where(is.numeric))
+```
+
+Calculate correlations and p values:
+
+```{r}
+cor.all <- rcorr(as.matrix(dat.cor.all))
+
+cor.all_matrix  <- round(cor.all$r, 2)
+pval.all_matrix <- round(cor.all$P, 3)
+```
+
+```{r}
+cor.all_matrix |> 
+  kable(caption = "Person correlation coefficients") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 12) |> 
+  scroll_box()
+
+pval.all_matrix |> 
+  kable(caption = "p values of Person correlation coefficients") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 12) |> 
+  scroll_box()
+```
+
+## Selected correlations
+
+Select columns and merge data frames:
+
+```{r}
+dat.cor.sel <- dat.w |> 
+  dplyr::select(mean.bodyweight, prop.lbw, igf2.ser.105dpc, igf2.ser.8dpp) |> 
+  mutate(prop.lbw = prop.lbw/100) |> 
+  rename(`Piglet birth weight` = mean.bodyweight,
+         `Proportion LBW`      = prop.lbw,
+         `IGF2 105dpc`         = igf2.ser.105dpc,
+         `IGF2 8dpp`           = igf2.ser.8dpp)
+```
+
+Calculate correlations and p values:
+
+```{r}
+cor.sel <- rcorr(as.matrix(dat.cor.sel))
+
+cor.sel_matrix  <- as_tibble(cor.sel$r, rownames = "Var1")
+pval.sel_matrix <- as_tibble(cor.sel$P, rownames = "Var1")
+```
+
+```{r}
+cor.sel_matrix |> 
+  kable(caption = "Person correlation coefficients") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 12) |> 
+  scroll_box()
+
+pval.sel_matrix |> 
+  kable(caption = "p values of Person correlation coefficients") |>
+  kable_styling(bootstrap_options = c("striped", "hover"), 
+                font_size = 12) |> 
+  scroll_box()
+```
+
+Heatmap:
+
+```{r}
+# Convert matrices into long format for ggplot
+cor_long <- pivot_longer(cor.sel_matrix,
+                         cols = !Var1,
+                         names_to = "Var2",
+                         values_to = "cor.val")
+
+p_long   <- pivot_longer(pval.sel_matrix,
+                         cols = !Var1,
+                         names_to = "Var2",
+                         values_to = "p.val")
+
+# Merge correlation values and p-values
+heatmap_data <- cor_long |> 
+  left_join(p_long, by = c("Var1", "Var2")) |> 
+  # this makes it to characters
+  mutate(cor.val = sprintf("%.2f", cor.val),
+         p.val = sprintf("%.3f", p.val)) |> 
+  mutate(cor.val = case_when(cor.val == "1.00" ~ NA_character_, 
+                             TRUE ~ cor.val)) |> 
+  mutate(p.val = case_when(p.val == "0.000" ~ "<0.001",
+                           is.na(p.val) ~ NA_character_, 
+                           TRUE ~ paste0("=",p.val))) |>
+  mutate(label = case_when(is.na(cor.val) ~ NA_character_, 
+                           TRUE ~ paste0(cor.val, "\n(p", p.val, ")")))
+```
+
+```{r}
+# Create the heatmap
+plot.corr <- heatmap_data |> 
+  ggplot(aes(Var1, Var2, fill = as.numeric(cor.val))) +
+  geom_tile(color = "white") +
+  scale_fill_viridis(limits = c(-1, 1), guide="none") +
+  # Overlay correlation & p-values
+  geom_text(aes(label = label), color = "white", size = 4) + 
+  my_theme_cor +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "",
+       x = "",
+       y = "")
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.corr
+```
+
+# Statistical model: general design
+
+To correctly account for the nested data structure in the analysis using a linear mixed model with the `lmerTest` package in R, we need to account for the hierarchical structure in the data:
+
+-   Husbandry Level (conventional/ecological): Each sow is housed in either of the two facilities.
+-   Sow Level: Each sow gave birth 1, 2 or 3 times, so these events are nested within sows.
+-   Time Point Level: Measurements were taken before and after each birth, introducing repeated measures within each pregnancy.
+-   control for age of the sows
+
+This type of nested structure is best represented by a model with random effects at the different levels to account for the dependencies within each level. The random effects allow for variation within subjects and
+
+```{r}
+contr = lmerControl(optimizer   = "bobyqa",
+                    optCtrl     = list(maxfun = 10000000),
+                    calc.derivs = FALSE)
+```
+
+# Cortisol serum
+
+## Model
+
+```{r}
+hist(dat.l |> 
+       dplyr::filter(parameter == "cort.ser") |> 
+       droplevels() |>
+       drop_na(value) |> 
+       pull("value"), 
+     breaks = 30)
+
+hist(log(dat.l |> 
+         dplyr::filter(parameter == "cort.ser") |> 
+         droplevels() |>
+         drop_na(value) |> 
+         pull("value")),
+     breaks = 30)
+```
+
+Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
+
+```{r}
+mod.cort1 <- lmerTest::lmer(log(value) ~ 
+                              husbandry +
+                              time +
+                              # interaction term
+                              husbandry : time +
+                              # random intercept for sows and for each litter within sow
+                              (1 | sow/litter.no),
+                            data    = dat.l |> 
+                              dplyr::filter(parameter == "cort.ser") |> 
+                              droplevels() |>
+                              drop_na(value),
+                            REML    = TRUE,
+                            control = contr)
+```
+
+```{r}
+summary(mod.cort1)
+```
+
+```{r}
+round(drop1(mod.cort1, test = 'Chisq'), 3)
+```
+
+Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
+
+```{r}
+car::Anova(mod.cort1,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.cort1,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.cort1)
+```
+
+## Emmeans & Effect sizes
+
+Most popular effect-size measure is probably Cohen’s d, which is defined as the observed difference, divided by the population SD; and obviously Cohen effect sizes are close cousins of pairwise differences. They are available via the `eff_size()` function of the `emmeans` package.
+
+### Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.cort1,
+        pairwise ~ husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "cort.ser") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.cort1),      # Residual standard deviation from model
+         edf = df.residual(mod.cort1))  # Residual degrees of freedom
+```
+
+### Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.cort1,
+        pairwise ~ time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "cort.ser") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.cort1),
+         edf = df.residual(mod.cort1))
+```
+
+### Husbandry:Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.cort1,
+        pairwise ~ husbandry|time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "cort.ser") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.cort1),
+         edf = df.residual(mod.cort1))
+```
+
+### Time point:Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.cort1,
+        pairwise ~ time|husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "cort.ser") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.cort1),
+         edf = df.residual(mod.cort1))
+```
+
+## Plot
+
+```{r}
+plot.cort1 <- dat.l  |> 
+  dplyr::filter(parameter == "cort.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
+  ggplot(aes(y   = value)) +
+  geom_boxplot(aes(x   = time, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = time,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 60), 
+                     breaks = seq(0, 60, 20),
+                     minor_breaks = seq(0, 60, by = 2) ) +
+  scale_x_discrete(labels= c("105dpc", "8dpp")) +
+  labs(x = "",
+       y = "Cortisol (serum) [ng/ml]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.cort1
+```
+
+# Cortisol saliva
+
+## Model
+
+```{r}
+hist(dat.l |> 
+       dplyr::filter(parameter == "cort.sal") |> 
+       droplevels() |>
+       drop_na(value) |> 
+       pull("value"), 
+     breaks = 30)
+
+hist(log(dat.l |> 
+         dplyr::filter(parameter == "cort.sal") |> 
+         droplevels() |>
+         drop_na(value) |> 
+         pull("value")),
+     breaks = 30)
+```
+
+Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
+
+```{r}
+mod.cort2 <- lmerTest::lmer(log(value) ~ 
+                              husbandry +
+                              time +
+                              # interaction term
+                              husbandry : time +
+                              # random intercept for sows and for each litter within sow
+                              (1 | sow/litter.no),
+                            data    = dat.l |> 
+                              dplyr::filter(parameter == "cort.sal") |> 
+                              droplevels() |>
+                              drop_na(value),
+                            REML    = TRUE,
+                            control = contr)
+```
+
+```{r}
+summary(mod.cort2)
+```
+
+```{r}
+round(drop1(mod.cort2, test = 'Chisq'), 3)
+```
+
+Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
+
+```{r}
+car::Anova(mod.cort2,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.cort2,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.cort2)
+```
+
+## Emmeans & Effect sizes
+
+### Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.cort2,
+        pairwise ~ husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "cort.sal") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.cort2),
+         edf = df.residual(mod.cort2))
+```
+
+### Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.cort2,
+        pairwise ~ time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "cort.sal") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.cort2),
+         edf = df.residual(mod.cort2))
+```
+
+### Husbandry:Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.cort2,
+        pairwise ~ husbandry|time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "cort.sal") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.cort2),
+         edf = df.residual(mod.cort2))
+```
+
+### Time point:Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.cort2,
+        pairwise ~ time|husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "cort.sal") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.cort2),
+         edf = df.residual(mod.cort2))
+```
+
+## Plot
+
+```{r}
+plot.cort2 <- dat.l  |> 
+  dplyr::filter(parameter == "cort.sal") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  # make plot
+  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
+  ggplot(aes(y   = value)) +
+  geom_boxplot(aes(x   = time, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = time,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 30), 
+                     breaks = seq(0, 30, 10),
+                     minor_breaks = seq(0, 30, by = 2) ) +
+  scale_x_discrete(labels= c("105dpc", "8dpp")) +
+  labs(x = "",
+       y = "Cortisol (saliva) [ng/mg protein]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.cort2
+```
+
+# IGF bioactivity
+
+## Model
+
+```{r}
+hist(dat.l |> 
+       dplyr::filter(parameter == "bioact.ser") |> 
+       droplevels() |>
+       drop_na(value) |> 
+       pull("value"), 
+     breaks = 30)
+
+hist(log(dat.l |> 
+         dplyr::filter(parameter == "bioact.ser") |> 
+         droplevels() |>
+         drop_na(value) |> 
+         pull("value")),
+     breaks = 30)
+```
+
+Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
+
+```{r}
+mod.bioact <- lmerTest::lmer(log(value) ~ 
+                               husbandry +
+                               time +
+                               # interaction term
+                               husbandry : time +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                               dplyr::filter(parameter == "bioact.ser") |> 
+                               drop_na(value) |> 
+                               dplyr::filter(time != "30dpc") |> 
+                               droplevels(),
+                            REML    = TRUE,
+                            control = contr)
+```
+
+```{r}
+summary(mod.bioact)
+```
+
+```{r}
+round(drop1(mod.bioact, test = 'Chisq'), 3)
+```
+
+Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
+
+```{r}
+car::Anova(mod.bioact,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.bioact,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.bioact)
+```
+
+## Emmeans & Effect sizes
+
+### Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.bioact,
+        pairwise ~ husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "bioact.ser") |> 
+          drop_na(value) |> 
+          dplyr::filter(time != "30dpc") |> 
+          droplevels(), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.bioact),
+         edf = df.residual(mod.bioact))
+```
+
+### Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.cort2,
+        pairwise ~ time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "bioact.ser") |> 
+          drop_na(value) |> 
+          dplyr::filter(time != "30dpc") |> 
+          droplevels(), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.bioact),
+         edf = df.residual(mod.bioact))
+```
+
+### Husbandry:Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.bioact,
+        pairwise ~ husbandry|time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "bioact.ser") |> 
+          drop_na(value) |> 
+          dplyr::filter(time != "30dpc") |> 
+          droplevels(), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.bioact),
+         edf = df.residual(mod.bioact))
+```
+
+### Time point:Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.bioact,
+        pairwise ~ time|husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "bioact.ser") |> 
+          drop_na(value) |> 
+          dplyr::filter(time != "30dpc") |> 
+          droplevels(), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.bioact),
+         edf = df.residual(mod.bioact))
+```
+
+## Plot
+
+```{r}
+plot.bioact <- dat.l  |> 
+  dplyr::filter(parameter == "bioact.ser") |> 
+  drop_na(value) |> 
+  dplyr::filter(time != "30dpc") |> 
+  droplevels() |>
+  # plot
+  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
+  ggplot(aes(y   = value)) +
+  geom_boxplot(aes(x   = time, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = time,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 600), 
+                     breaks = seq(0, 600, 200),
+                     minor_breaks = seq(0, 600, by = 50) ) +
+  scale_x_discrete(labels= c("105dpc", "8dpp")) +
+  labs(x = "",
+       y = "IGF bioactivity [ng/ml]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.bioact
+```
+
+# IGF1 (serum)
+
+## Model
+
+```{r}
+hist(dat.l |> 
+       dplyr::filter(parameter == "igf1.ser") |> 
+       droplevels() |> 
+       drop_na(value) |> 
+       pull("value"), 
+     breaks = 30)
+
+hist(log(dat.l |> 
+       dplyr::filter(parameter == "igf1.ser") |> 
+       droplevels() |> 
+       drop_na(value) |> 
+       pull("value")),
+     breaks = 30)
+```
+
+Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
+
+```{r}
+mod.igf1 <- lmerTest::lmer(log(value) ~ 
+                              husbandry +
+                              time +
+                              # interaction term
+                              husbandry : time +
+                              # random intercept for sows and for each litter within sow
+                              (1 | sow/litter.no),
+                            data    = dat.l |> 
+                              dplyr::filter(parameter == "igf1.ser") |> 
+                              droplevels() |>
+                              drop_na(value),
+                            REML    = TRUE,
+                            control = contr)
+```
+
+```{r}
+summary(mod.igf1)
+```
+
+```{r}
+round(drop1(mod.igf1, test = 'Chisq'), 3)
+```
+
+Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
+
+```{r}
+car::Anova(mod.igf1,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.igf1,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.igf1)
+```
+
+## Emmeans & Effect sizes
+
+### Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igf1,
+        pairwise ~ husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igf1.ser") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igf1),
+         edf = df.residual(mod.igf1))
+```
+
+### Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igf1,
+        pairwise ~ time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igf1.ser") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igf1),
+         edf = df.residual(mod.igf1))
+```
+
+### Husbandry:Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igf1,
+        pairwise ~ husbandry|time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igf1.ser") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igf1),
+         edf = df.residual(mod.igf1))
+```
+
+### Time point:Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igf1,
+        pairwise ~ time|husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igf1.ser") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igf1),
+         edf = df.residual(mod.igf1))
+```
+
+## Plot
+
+```{r}
+plot.igf1 <- dat.l  |> 
+  dplyr::filter(parameter == "igf1.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  # plot
+  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
+  ggplot(aes(y   = value)) +
+  geom_boxplot(aes(x   = time, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = time,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 500), 
+                     breaks = seq(0, 500, 100),
+                     minor_breaks = seq(0, 500, by = 20) ) +
+  scale_x_discrete(labels= c("105dpc", "8dpp")) +
+  labs(x = "",
+       y = "IGF1 (serum) [ng/ml]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.igf1
+```
+
+# IGF2 (serum)
+
+## Model
+
+```{r}
+hist(dat.l |> 
+       dplyr::filter(parameter == "igf2.ser") |> 
+       droplevels() |> 
+       drop_na(value) |> 
+       pull("value"), 
+     breaks = 30)
+
+hist(log(dat.l |> 
+       dplyr::filter(parameter == "igf2.ser") |> 
+       droplevels() |>
+       drop_na(value) |> 
+       pull("value")),
+     breaks = 30)
+```
+
+Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
+
+```{r}
+mod.igf2 <- lmerTest::lmer(log(value) ~ 
+                              husbandry +
+                              time +
+                              # interaction term
+                              husbandry : time +
+                              # random intercept for sows and for each litter within sow
+                              (1 | sow/litter.no),
+                            data    = dat.l |> 
+                              dplyr::filter(parameter == "igf2.ser") |> 
+                              droplevels() |> 
+                              drop_na(value),
+                            REML    = TRUE,
+                            control = contr)
+```
+
+```{r}
+summary(mod.igf2)
+```
+
+```{r}
+round(drop1(mod.igf2, test = 'Chisq'), 3)
+```
+
+Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
+
+```{r}
+car::Anova(mod.igf2,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.igf2,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.igf2)
+```
+
+## Emmeans & Effect sizes
+
+### Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igf2,
+        pairwise ~ husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igf2.ser") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igf2),
+         edf = df.residual(mod.igf2))
+```
+
+### Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igf2,
+        pairwise ~ time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igf2.ser") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igf2),
+         edf = df.residual(mod.igf2))
+```
+
+### Husbandry:Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igf2,
+        pairwise ~ husbandry|time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igf2.ser") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igf2),
+         edf = df.residual(mod.igf2))
+```
+
+### Time point:Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igf2,
+        pairwise ~ time|husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igf2.ser") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igf2),
+         edf = df.residual(mod.igf2))
+```
+
+## Plot
+
+```{r}
+plot.igf2 <- dat.l  |> 
+  dplyr::filter(parameter == "igf2.ser") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # plot
+  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
+  ggplot(aes(y   = value)) +
+  geom_boxplot(aes(x   = time, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = time,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 200), 
+                     breaks = seq(0, 200, 50),
+                     minor_breaks = seq(0, 200, by = 10) ) +
+  scale_x_discrete(labels= c("105dpc", "8dpp")) +
+  labs(x = "",
+       y = "IGF2 (serum) [ng/ml]",
+       fill = "Husbandry") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5))) +
+  my_theme +
+  theme(legend.position = c(0.25, 0.85),
+        legend.box = "horizontal")
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.igf2
+```
+
+# Combined plots: Figure 3
+
+```{r}
+# Combine plots with a designated area for the legend
+combined <- (plot.cort1 + 
+             plot.cort2 + 
+             plot.bioact + 
+             plot.igf1) + 
+  plot_layout(guides = "collect") +
+  plot_annotation(tag_levels = 'A') &
+  theme(plot.tag = element_text(face = "bold", size = 20),
+        legend.position = "bottom",
+        legend.direction = "horizontal")
+```
+
+```{r, fig.height=20, fig.width=20, warning=FALSE}
+combined
+```
+
+```{r, eval = TRUE}
+png("./plots/figure3.png",
+     width = 300, height = 300, units = "mm",
+     pointsize = 10, res = 600)
+
+combined
+
+dev.off()
+```
+
+# Combined plots: Figure 4
+
+```{r}
+# Combine plots with a designated area for the legend
+combined <- (plot.igf2 +
+             plot.corr) + 
+  #plot_layout(guides = "collect") +
+  plot_annotation(tag_levels = 'A') &
+  theme(plot.tag = element_text(face = "bold", size = 20))
+```
+
+```{r, fig.height=20, fig.width=20, warning=FALSE}
+combined
+```
+
+```{r, eval = TRUE}
+png("./plots/figure4.png",
+     width = 300, height = 200, units = "mm",
+     pointsize = 10, res = 600)
+
+combined
+
+dev.off()
+```
+
+# Litter numbers
+
+```{r}
+plot.bio.li <- dat.w  |> 
+  # plot
+  mutate(jit = jitter(as.numeric(litter.no), 0.3)) |>  
+  ggplot(aes(y   = bioact.ser.105dpc)) +
+  geom_boxplot(aes(x   = litter.no, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = litter.no,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 600), 
+                     breaks = seq(0, 600, 200),
+                     minor_breaks = seq(0, 600, by = 50) ) +
+  scale_x_discrete(labels= c("1st", "2nd", "3rd")) +
+  labs(x = "Litter number",
+       y = "IGF bioactivity 105dpc [ng/ml]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "bottom") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r}
+plot.lbw.li <- dat.w  |> 
+  # plot
+  mutate(jit = jitter(as.numeric(litter.no), 0.3)) |>  
+  ggplot(aes(y   = prop.lbw)) +
+  geom_boxplot(aes(x   = litter.no, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = litter.no,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 100), 
+                     breaks = seq(0, 100, 20),
+                     minor_breaks = seq(0, 100, by = 5) ) +
+  scale_x_discrete(labels= c("1st", "2nd", "3rd")) +
+  labs(x = "Litter number",
+       y = "Proportion LBW [%]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "bottom") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+# Combined plots: Figure 5
+
+```{r}
+# Combine plots with a designated area for the legend
+combined <- (plot.bio.li + 
+             plot.lbw.li) + 
+  plot_layout(guides = "collect") +
+  plot_annotation(tag_levels = 'A') &
+  theme(plot.tag = element_text(face = "bold", size = 20),
+        legend.position = "bottom")
+```
+
+```{r, fig.height=20, fig.width=20, warning=FALSE}
+combined
+```
+
+```{r, eval = TRUE}
+png("./plots/figure5.png",
+     width = 300, height = 200, units = "mm",
+     pointsize = 10, res = 600)
+
+combined
+
+dev.off()
+```
+
+# IGFBP2 (serum)
+
+## Model
+
+```{r}
+hist(dat.l |> 
+       dplyr::filter(parameter == "igfbp2.ser") |> 
+       droplevels() |> 
+       drop_na(value) |> 
+       pull("value"), 
+     breaks = 30)
+
+hist(log(dat.l |> 
+         dplyr::filter(parameter == "igfbp2.ser") |> 
+         droplevels() |>
+         drop_na(value) |> 
+         pull("value")),
+     breaks = 30)
+```
+
+Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
+
+```{r}
+mod.igfbp2 <- lmerTest::lmer(log(value) ~ 
+                               husbandry +
+                               time +
+                               # interaction term
+                               husbandry : time +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                               dplyr::filter(parameter == "igfbp2.ser") |> 
+                               droplevels() |> 
+                               drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.igfbp2)
+```
+
+```{r}
+round(drop1(mod.igfbp2, test = 'Chisq'), 3)
+```
+
+Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
+
+```{r}
+car::Anova(mod.igfbp2,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.igfbp2,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.igfbp2)
+```
+
+## Emmeans & Effect sizes
+
+### Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igfbp2,
+        pairwise ~ husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igfbp2.ser") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igfbp2),
+         edf = df.residual(mod.igfbp2))
+```
+
+### Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igfbp2,
+        pairwise ~ time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igfbp2.ser") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igfbp2),
+         edf = df.residual(mod.igfbp2))
+```
+
+### Husbandry:Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igfbp2,
+        pairwise ~ husbandry|time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igfbp2.ser") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igfbp2),
+         edf = df.residual(mod.igfbp2))
+```
+
+### Time point:Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igfbp2,
+        pairwise ~ time|husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igfbp2.ser") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igfbp2),
+         edf = df.residual(mod.igfbp2))
+```
+
+## Plot
+
+```{r}
+plot.igfbp2 <- dat.l  |> 
+  dplyr::filter(parameter == "igfbp2.ser") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # plot
+  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
+  ggplot(aes(y   = value)) +
+  geom_boxplot(aes(x   = time, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = time,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 1250), 
+                     breaks = seq(0, 1250, 250),
+                     minor_breaks = seq(0, 1250, by = 100) ) +
+  scale_x_discrete(labels= c("105dpc", "8dpp")) +
+  labs(x = "",
+       y = "IGF BP2 (serum) [ng/ml]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.igfbp2
+```
+
+# IGFBP3 (serum)
+
+## Model
+
+```{r}
+hist(dat.l |> 
+       dplyr::filter(parameter == "igfbp3.ser") |> 
+       droplevels() |> 
+       drop_na(value) |> 
+       pull("value"), 
+     breaks = 30)
+
+hist(log(dat.l |> 
+         dplyr::filter(parameter == "igfbp3.ser") |> 
+         droplevels() |> 
+         drop_na(value) |> 
+         pull("value")),
+     breaks = 30)
+```
+
+Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
+
+```{r}
+mod.igfbp3 <- lmerTest::lmer(log(value) ~ 
+                               husbandry +
+                               time +
+                               # interaction term
+                               husbandry : time +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                               dplyr::filter(parameter == "igfbp3.ser") |> 
+                               droplevels() |> 
+                               drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.igfbp3)
+```
+
+```{r}
+round(drop1(mod.igfbp3, test = 'Chisq'), 3)
+```
+
+Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
+
+```{r}
+car::Anova(mod.igfbp3,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.igfbp3,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.igfbp3)
+```
+
+## Emmeans & Effect sizes
+
+### Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igfbp3,
+        pairwise ~ husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igfbp3.ser") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igfbp3),
+         edf = df.residual(mod.igfbp3))
+```
+
+### Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igfbp3,
+        pairwise ~ time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igfbp3.ser") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igfbp3),
+         edf = df.residual(mod.igfbp3))
+```
+
+### Husbandry:Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igfbp3,
+        pairwise ~ husbandry|time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igfbp3.ser") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igfbp3),
+         edf = df.residual(mod.igfbp3))
+```
+
+### Time point:Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igfbp3,
+        pairwise ~ time|husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igfbp3.ser") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igfbp3),
+         edf = df.residual(mod.igfbp3))
+```
+
+## Plot
+
+```{r}
+plot.igfbp3 <- dat.l  |> 
+  dplyr::filter(parameter == "igfbp3.ser") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # plot
+  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
+  ggplot(aes(y   = value)) +
+  geom_boxplot(aes(x   = time, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = time,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 6500), 
+                     breaks = seq(0, 6500, 2000),
+                     minor_breaks = seq(0, 6500, by = 200) ) +
+  scale_x_discrete(labels= c("105dpc", "8dpp")) +
+  labs(x = "",
+       y = "IGF BP3 (serum) [ng/ml]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.igfbp3
+```
+
+# IGFBP2/IGFBP3 (serum)
+
+## Model
+
+```{r}
+hist(dat.l |> 
+       dplyr::filter(parameter == "igfbp23.ser") |> 
+       droplevels() |> 
+       drop_na(value) |> 
+       pull("value"), 
+     breaks = 30)
+
+hist(log(dat.l |> 
+         dplyr::filter(parameter == "igfbp23.ser") |> 
+         droplevels() |>
+         drop_na(value) |> 
+         pull("value")),
+     breaks = 30)
+```
+
+Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
+
+```{r}
+mod.igfbp23 <- lmerTest::lmer(log(value) ~ 
+                               husbandry +
+                               time +
+                               # interaction term
+                               husbandry : time +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                               dplyr::filter(parameter == "igfbp23.ser") |> 
+                               droplevels() |>
+                               drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.igfbp23)
+```
+
+```{r}
+round(drop1(mod.igfbp23, test = 'Chisq'), 3)
+```
+
+Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
+
+```{r}
+car::Anova(mod.igfbp23,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.igfbp23,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.igfbp23)
+```
+
+## Emmeans & Effect sizes
+
+### Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igfbp23,
+        pairwise ~ husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igfbp23.ser") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igfbp23),
+         edf = df.residual(mod.igfbp23))
+```
+
+### Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igfbp23,
+        pairwise ~ time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igfbp23.ser") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igfbp23),
+         edf = df.residual(mod.igfbp23))
+```
+
+### Husbandry:Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igfbp23,
+        pairwise ~ husbandry|time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igfbp23.ser") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igfbp23),
+         edf = df.residual(mod.igfbp23))
+```
+
+### Time point:Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.igfbp23,
+        pairwise ~ time|husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "igfbp23.ser") |> 
+          droplevels() |>
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.igfbp23),
+         edf = df.residual(mod.igfbp23))
+```
+
+## Plot
+
+```{r}
+plot.igfbp23 <- dat.l  |> 
+  dplyr::filter(parameter == "igfbp23.ser") |> 
+  droplevels() |>
+  drop_na(value) |> 
+  # plot
+  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
+  ggplot(aes(y   = (value))) +
+  geom_boxplot(aes(x   = time, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = time,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 2.5), 
+                     breaks = seq(0, 2.5, 0.5),
+                     minor_breaks = seq(0, 2.5, by = 0.1) ) +
+  scale_x_discrete(labels= c("105dpc", "8dpp")) +
+  labs(x = "",
+       y = "Molar ratio of IGFBP2/IGFBP3 (serum)",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.igfbp23
+```
+
+# Proteolytic activity (serum)
+
+## Model
+
+```{r}
+hist(dat.l |> 
+       dplyr::filter(parameter == "proteolysis") |> 
+       droplevels() |> 
+       drop_na(value) |> 
+       pull("value"), 
+     breaks = 30)
+
+hist(log(dat.l |> 
+         dplyr::filter(parameter == "proteolysis") |> 
+         droplevels() |> 
+         drop_na(value) |> 
+         pull("value")),
+     breaks = 30)
+```
+
+Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
+
+```{r}
+mod.prot <- lmerTest::lmer(log(value+1) ~ 
+                               husbandry +
+                               time +
+                               # interaction term
+                               husbandry : time +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                              dplyr::filter(parameter == "proteolysis") |> 
+                              droplevels() |> 
+                              drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.prot)
+```
+
+```{r}
+round(drop1(mod.prot, test = 'Chisq'), 3)
+```
+
+Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
+
+```{r}
+car::Anova(mod.prot,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.prot,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r}
+performance::check_model(mod.prot)
+```
+
+## Emmeans & Effect sizes
+
+### Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.prot,
+        pairwise ~ husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "proteolysis") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.prot),
+         edf = df.residual(mod.prot))
+```
+
+### Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.prot,
+        pairwise ~ time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "proteolysis") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.prot),
+         edf = df.residual(mod.prot))
+```
+
+### Husbandry:Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.prot,
+        pairwise ~ husbandry|time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "proteolysis") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.prot),
+         edf = df.residual(mod.prot))
+```
+
+### Time point:Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.prot,
+        pairwise ~ time|husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "proteolysis") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.prot),
+         edf = df.residual(mod.prot))
+```
+
+## Plot
+
+```{r}
+plot.prot <- dat.l  |> 
+  dplyr::filter(parameter == "proteolysis") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # plot
+  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
+  ggplot(aes(y   = value)) +
+  geom_boxplot(aes(x   = time, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = time,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 21), 
+                     breaks = seq(0, 21, 5),
+                     minor_breaks = seq(0, 21, by = 1) ) +
+  scale_x_discrete(labels= c("105dpc", "8dpp")) +
+  labs(x = "",
+       y = "Proteolytic activity (serum) [%]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.prot
+```
+
+# Stanniocalcin, STC1 (serum)
+
+## Model
+
+```{r}
+hist(dat.l |> 
+       dplyr::filter(parameter == "stc1") |> 
+       droplevels() |> 
+       drop_na(value) |> 
+       pull("value"), 
+     breaks = 30)
+
+hist(log(dat.l |> 
+         dplyr::filter(parameter == "stc1") |> 
+         droplevels() |> 
+         drop_na(value) |> 
+         pull("value")),
+     breaks = 30)
+```
+
+Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
+
+```{r}
+mod.stc1 <- lmerTest::lmer(log(value) ~ 
+                               husbandry +
+                               time +
+                               # interaction term
+                               husbandry : time +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                               dplyr::filter(parameter == "stc1") |> 
+                               droplevels() |> 
+                               drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.stc1)
+```
+
+```{r}
+round(drop1(mod.stc1, test = 'Chisq'), 3)
+```
+
+Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
+
+```{r}
+car::Anova(mod.stc1,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.stc1,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.stc1)
+```
+
+## Emmeans & Effect sizes
+
+### Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.stc1,
+        pairwise ~ husbandry, 
+        data    = dat.l |>
+          dplyr::filter(parameter == "stc1") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.stc1),
+         edf = df.residual(mod.stc1))
+```
+
+### Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.stc1,
+        pairwise ~ time, 
+        data    = dat.l |>
+          dplyr::filter(parameter == "stc1") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.stc1),
+         edf = df.residual(mod.stc1))
+```
+
+### Husbandry:Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.stc1,
+        pairwise ~ husbandry|time, 
+        data    = dat.l |>
+          dplyr::filter(parameter == "stc1") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.stc1),
+         edf = df.residual(mod.stc1))
+```
+
+### Time point:Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.stc1,
+        pairwise ~ time|husbandry, 
+        data    = dat.l |>
+          dplyr::filter(parameter == "stc1") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.stc1),
+         edf = df.residual(mod.stc1))
+```
+
+## Plot
+
+```{r}
+plot.stc1 <- dat.l  |> 
+  dplyr::filter(parameter == "stc1") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # plot
+  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
+  ggplot(aes(y   = value)) +
+  geom_boxplot(aes(x   = time, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = time,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 10000), 
+                     breaks = seq(0, 10000, 2000),
+                     minor_breaks = seq(0, 10000, by = 400) ) +
+  scale_x_discrete(labels= c("105dpc", "8dpp")) +
+  labs(x = "",
+       y = "STC1 (serum) [pg/ml]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.stc1
+```
+
+# Combined plots: Figure 6
+
+```{r}
+# Combine plots with a designated area for the legend
+combined <- (plot.igfbp23 + 
+             plot.stc1) + 
+  plot_annotation(tag_levels = 'A') &
+  theme(plot.tag = element_text(face = "bold", size = 20),
+        legend.position = "bottom")
+```
+
+```{r, fig.height=20, fig.width=20, warning=FALSE}
+combined
+```
+
+```{r, eval = TRUE}
+png("./plots/figure6.png",
+     width = 300, height = 200, units = "mm",
+     pointsize = 10, res = 600)
+
+combined
+
+dev.off()
+```
+
+# Calcium (serum)
+
+## Model
+
+```{r}
+hist(dat.l |> 
+       dplyr::filter(parameter == "calc") |> 
+       droplevels() |> 
+       drop_na(value) |> 
+       pull("value"), 
+     breaks = 30)
+
+hist(log(dat.l |> 
+         dplyr::filter(parameter == "calc") |> 
+         droplevels() |> 
+         drop_na(value) |> 
+         pull("value")),
+     breaks = 30)
+```
+
+Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
+
+```{r}
+mod.calc <- lmerTest::lmer(log(value) ~ 
+                               husbandry +
+                               time +
+                               # interaction term
+                               husbandry : time +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                               dplyr::filter(parameter == "calc") |> 
+                               dplyr::filter(time != "30dpc") |> 
+                               droplevels() |> 
+                               drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.calc)
+```
+
+```{r}
+round(drop1(mod.calc, test = 'Chisq'), 3)
+```
+
+Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
+
+```{r}
+car::Anova(mod.calc,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.calc,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r, fig.height=30, fig.width=20, warning=FALSE}
+performance::check_model(mod.calc)
+```
+
+## Emmeans & Effect sizes
+
+### Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.calc,
+        pairwise ~ husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "calc") |> 
+          dplyr::filter(time != "30dpc") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.calc),
+         edf = df.residual(mod.calc))
+```
+
+### Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.calc,
+        pairwise ~ time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "calc") |> 
+          dplyr::filter(time != "30dpc") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.calc),
+         edf = df.residual(mod.calc))
+```
+
+### Husbandry:Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.calc,
+        pairwise ~ husbandry|time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "calc") |> 
+          dplyr::filter(time != "30dpc") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.calc),
+         edf = df.residual(mod.calc))
+```
+
+### Time point:Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.calc,
+        pairwise ~ time|husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "calc") |> 
+          dplyr::filter(time != "30dpc") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.calc),
+         edf = df.residual(mod.calc))
+```
+
+## Plot
+
+```{r}
+plot.calc <- dat.l  |> 
+  dplyr::filter(parameter == "calc") |> 
+  dplyr::filter(time != "30dpc") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # plot
+  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
+  ggplot(aes(y   = value)) +
+  geom_boxplot(aes(x   = time, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = time,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 21), 
+                     breaks = seq(0, 20, 5),
+                     minor_breaks = seq(0, 20, by = 2) ) +
+  scale_x_discrete(labels= c("105dpc", "8dpp")) +
+  labs(x = "",
+       y = "Calcium (serum) [mg/dl]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.calc
+```
+
+# How to cite R
+
+"All analyses were performed using R Statistical Software (version 4.4.2; R Core Team 2024)".
+
+Reference: R Core Team (2024). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+
+```{r, cite-r}
+citation()
+version$version.string
+```
+
+```{r, cite-packages}
+citation("tidyverse")
+citation("kableExtra")
+citation("patchwork")
+citation("lmerTest")
+citation("car")
+citation("emmeans")
+citation("performance")
+citation("Hmisc")
+citation("viridis")
+```
+
+# Session Info
+
+```{r, session}
+sessionInfo()
+```

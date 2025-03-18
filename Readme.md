@@ -28,15 +28,17 @@ R Core Team (2024). R: A Language and Environment for Statistical Computing. R F
 THE REPOSITORY CONTAINS:
 1. Main folder with 5 quarto files and rendered reports in html
     + `igf-biomarker-summary-stats.qmd`: data processing, data summary statistics, processed data saved in "./data/data-processed.RData"
-    + `igf-biomarker-models.qmd`: fitting linear mixed models, generating figures, using `data-processed.RData`
+    + `igf-biomarker-models.qmd`: linear mixed models, generating figures, using `data-processed.RData`
     + `igf-biomarker-pca.qmd`: PCA and cluster analysis, using `data-processed.RData` and imputed data from `missing_value_imputation.ipynb`
     + `missing_value_imputation.ipynb`: Jupyter Notebook with kNN imputation in Python
+    + `igf-confounder-age.qmd`: linear mixed model including age, supplements
+    + `igf-confounder-boar.qmd`: linear mixed model including boars, supplements
 3. Folder *data* with one xlsx-files:
     + `data-matrix.xlsx` with sheets:
-      + `data_ori`
-      + `data_ori_knn`
-      + `data_imp`
-      + `parameter description` 
+      + `data_ori`: measured data
+      + `data_ori_knn`: subset of variables used for kNN imputation
+      + `data_imp`: imputed data set
+      + `parameter description`: some meta information
 4. Folder *plots* with 8 plots:
     + `figure3.png`: Effects of the husbandry system on cortisol and IGF bioactivity
     + `figure4.png`: Husbandry dependent IGF concentrations

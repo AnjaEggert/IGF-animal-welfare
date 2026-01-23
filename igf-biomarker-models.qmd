@@ -1,6 +1,7 @@
 ---
-title: "Correlations + Mixed models (Igf & animal welfare)"
-author: "Anja Eggert & Anne-Marie Galow"
+title: "Intertwining of the Igf system and animal welfare"
+subtitle: "Linear mixed models"
+author: "Anja Eggert, Anne-Marie Galow, et al."
 date: "`r Sys.Date()`" 
 editor: visual
 code-fold: false
@@ -273,8 +274,6 @@ performance::check_model(mod.cort1)
 
 ## Emmeans & Effect sizes
 
-Most popular effect-size measure is probably Cohen’s d, which is defined as the observed difference, divided by the population SD; and obviously Cohen effect sizes are close cousins of pairwise differences. They are available via the `eff_size()` function of the `emmeans` package.
-
 ### Husbandry
 
 Emmeans:
@@ -332,23 +331,23 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.cort1,
-        pairwise ~ husbandry|time, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "cort.ser") |> 
-          droplevels() |>
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.cort1_ht <- emmeans(mod.cort1,
+                        pairwise ~ husbandry|time, 
+                        data    = dat.l |> 
+                          dplyr::filter(parameter == "cort.ser") |> 
+                          droplevels() |>
+                          drop_na(value), 
+                        adjust  = "tukey",
+                        lmer.df = "satterthwaite",
+                        type    = "response")
 
-emm
+emm.cort1_ht
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.cort1_ht,
          sigma = sigma(mod.cort1),
          edf = df.residual(mod.cort1))
 ```
@@ -358,23 +357,23 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.cort1,
-        pairwise ~ time|husbandry, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "cort.ser") |> 
-          droplevels() |>
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.cort1_th <- emmeans(mod.cort1,
+                        pairwise ~ time|husbandry, 
+                        data    = dat.l |> 
+                          dplyr::filter(parameter == "cort.ser") |> 
+                          droplevels() |>
+                          drop_na(value), 
+                        adjust  = "tukey",
+                        lmer.df = "satterthwaite",
+                        type    = "response")
 
-emm
+emm.cort1_th
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.cort1_th,
          sigma = sigma(mod.cort1),
          edf = df.residual(mod.cort1))
 ```
@@ -545,23 +544,23 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.cort2,
-        pairwise ~ husbandry|time, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "cort.sal") |> 
-          droplevels() |>
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.cort2_ht <- emmeans(mod.cort2,
+                        pairwise ~ husbandry|time, 
+                        data    = dat.l |> 
+                          dplyr::filter(parameter == "cort.sal") |> 
+                          droplevels() |>
+                          drop_na(value), 
+                        adjust  = "tukey",
+                        lmer.df = "satterthwaite",
+                        type    = "response")
 
-emm
+emm.cort2_ht
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.cort2_ht,
          sigma = sigma(mod.cort2),
          edf = df.residual(mod.cort2))
 ```
@@ -571,23 +570,23 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.cort2,
-        pairwise ~ time|husbandry, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "cort.sal") |> 
-          droplevels() |>
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.cort2_th <- emmeans(mod.cort2,
+                        pairwise ~ time|husbandry, 
+                        data    = dat.l |> 
+                          dplyr::filter(parameter == "cort.sal") |> 
+                          droplevels() |>
+                          drop_na(value), 
+                        adjust  = "tukey",
+                        lmer.df = "satterthwaite",
+                        type    = "response")
 
-emm
+emm.cort2_th
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.cort2_th,
          sigma = sigma(mod.cort2),
          edf = df.residual(mod.cort2))
 ```
@@ -761,24 +760,24 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.bioact,
-        pairwise ~ husbandry|time, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "bioact.ser") |> 
-          drop_na(value) |> 
-          dplyr::filter(time != "30dpc") |> 
-          droplevels(), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.bioact_ht <- emmeans(mod.bioact,
+                         pairwise ~ husbandry|time, 
+                         data    = dat.l |> 
+                           dplyr::filter(parameter == "bioact.ser") |> 
+                           drop_na(value) |> 
+                           dplyr::filter(time != "30dpc") |> 
+                           droplevels(), 
+                         adjust  = "tukey",
+                         lmer.df = "satterthwaite",
+                         type    = "response")
 
-emm
+emm.bioact_ht
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.bioact_ht,
          sigma = sigma(mod.bioact),
          edf = df.residual(mod.bioact))
 ```
@@ -788,29 +787,52 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.bioact,
-        pairwise ~ time|husbandry, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "bioact.ser") |> 
-          drop_na(value) |> 
-          dplyr::filter(time != "30dpc") |> 
-          droplevels(), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.bioact_th <- emmeans(mod.bioact,
+                         pairwise ~ time|husbandry, 
+                         data    = dat.l |> 
+                           dplyr::filter(parameter == "bioact.ser") |> 
+                           drop_na(value) |> 
+                           dplyr::filter(time != "30dpc") |> 
+                           droplevels(), 
+                         adjust  = "tukey",
+                         lmer.df = "satterthwaite",
+                         type    = "response")
 
-emm
+emm.bioact_th
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.bioact_th,
          sigma = sigma(mod.bioact),
          edf = df.residual(mod.bioact))
 ```
 
 ## Plot
+
+Add significant contrasts to the plot:
+
+```{r}
+contr.bioact_ht <- contrast(emm.bioact_ht, method = "pairwise") |>
+  as.data.frame() |>
+  as_tibble() |>
+  mutate(p.label = dplyr::case_when(
+    p.value < 0.001 ~ "p < 0.001",
+    p.value < 0.05  ~ sprintf("p = %.3f", p.value),
+    TRUE            ~ NA_character_)) |>
+  # for brackets
+  mutate(
+    group1 = "conventional",
+    group2 = "ecological") |>
+  mutate(
+    x = as.numeric(time),
+    xmin = x - 0.25 * 0.5,
+    xmax = x + 0.25 * 0.5) |>
+  mutate(y.position = 190) |> 
+  # only significant results
+  dplyr::filter(!is.na(p.label))
+```
 
 ```{r}
 plot.bioact <- dat.l  |> 
@@ -832,15 +854,28 @@ plot.bioact <- dat.l  |>
                                               dodge.width   = 0.5),
               size = 2, alpha = 0.7,
               show.legend = FALSE) +
+  ggpubr::stat_pvalue_manual(
+    contr.bioact_ht,
+    inherit.aes = FALSE,
+    label = "p.label",
+    xmin = "xmin",
+    xmax = "xmax",
+    y.position = "y.position",
+    size = 14/.pt,
+    bracket.size = 0.8, 
+    tip.length = 0.03,
+    position = position_dodge(width = 0.5)) +
   scale_fill_manual(labels = c("Conventional",
                                "Ecological"),
                     values = c("#FFA040", "#008000")) +
-  scale_y_continuous(lim = c(0, 600), 
-                     breaks = seq(0, 600, 200),
-                     minor_breaks = seq(0, 600, by = 50) ) +
+  scale_y_continuous(breaks = seq(0, 200, 50),
+                     minor_breaks = seq(0, 200, by = 10),
+                     expand = expansion(mult = c(0.05, 0.1))) +
+  # important to define limits of the coord system not of the y-axis
+  coord_cartesian(ylim = c(0, 200), clip = "off") +
   scale_x_discrete(labels= c("105dpc", "8dpp")) +
   labs(x = "",
-       y = "IGF bioactivity [ng/ml]",
+       y = "Normalized IGF-dependent bioactivity [%]",
        fill = "Husbandry") +
   my_theme +
   theme(legend.position = "top") +
@@ -977,23 +1012,23 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.igf1,
-        pairwise ~ husbandry|time, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "igf1.ser") |> 
-          droplevels() |>
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.igf1_ht <- emmeans(mod.igf1,
+                       pairwise ~ husbandry|time, 
+                       data    = dat.l |> 
+                         dplyr::filter(parameter == "igf1.ser") |> 
+                         droplevels() |>
+                         drop_na(value), 
+                       adjust  = "tukey",
+                       lmer.df = "satterthwaite",
+                       type    = "response")
 
-emm
+emm.igf1_ht
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.igf1_ht,
          sigma = sigma(mod.igf1),
          edf = df.residual(mod.igf1))
 ```
@@ -1003,28 +1038,55 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.igf1,
-        pairwise ~ time|husbandry, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "igf1.ser") |> 
-          droplevels() |>
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.igf1_th <- emmeans(mod.igf1,
+                       pairwise ~ time|husbandry, 
+                       data    = dat.l |> 
+                         dplyr::filter(parameter == "igf1.ser") |> 
+                         droplevels() |>
+                         drop_na(value), 
+                       adjust  = "tukey",
+                       lmer.df = "satterthwaite",
+                       type    = "response")
 
-emm
+emm.igf1_th
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.igf1_th,
          sigma = sigma(mod.igf1),
          edf = df.residual(mod.igf1))
 ```
 
 ## Plot
+
+Add significant contrasts to the plot:
+
+```{r}
+contr.igf1_th <- contrast(emm.igf1_th, method = "pairwise") |>
+  as.data.frame() |>
+  as_tibble() |>
+  mutate(p.label = dplyr::case_when(
+    p.value < 0.001 ~ "p < 0.001",
+    p.value < 0.05  ~ sprintf("p = %.3f", p.value),
+    TRUE            ~ NA_character_)) |>
+  # for brackets
+  mutate(
+    group1 = "105dpc",
+    group2 = "8dpp") |>
+  mutate(
+    xmin = case_when(
+      husbandry == "conventional" ~ 0.875,
+      husbandry == "ecological"   ~ 1.125
+    ),
+    xmax = case_when(
+      husbandry == "conventional" ~ 1.875,
+      husbandry == "ecological"   ~ 2.125)) |>
+  mutate(y.position = 405) |> 
+  # only significant results
+  dplyr::filter(!is.na(p.label))
+```
 
 ```{r}
 plot.igf1 <- dat.l  |> 
@@ -1045,12 +1107,26 @@ plot.igf1 <- dat.l  |>
                                               dodge.width   = 0.5),
               size = 2, alpha = 0.7,
               show.legend = FALSE) +
+  ggpubr::stat_pvalue_manual(
+    contr.igf1_th,
+    inherit.aes = FALSE,
+    label = "p.label",
+    xmin = "xmin",
+    xmax = "xmax",
+    y.position = "y.position",
+    step.increase = 0.1,
+    size = 14/.pt,
+    bracket.size = 0.8, 
+    tip.length = 0.03,
+    position = position_dodge(width = 0.5)) +
   scale_fill_manual(labels = c("Conventional",
                                "Ecological"),
                     values = c("#FFA040", "#008000")) +
-  scale_y_continuous(lim = c(0, 500), 
-                     breaks = seq(0, 500, 100),
-                     minor_breaks = seq(0, 500, by = 20) ) +
+  scale_y_continuous(breaks = seq(0, 410, 100),
+                     minor_breaks = seq(0, 405, by = 20),
+                     expand = expansion(mult = c(0.05, 0.1))) +
+  # important to define limits of the coord system not of the y-axis
+  coord_cartesian(ylim = c(0, 410), clip = "off") +
   scale_x_discrete(labels= c("105dpc", "8dpp")) +
   labs(x = "",
        y = "IGF1 (serum) [ng/ml]",
@@ -1190,23 +1266,23 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.igf2,
-        pairwise ~ husbandry|time, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "igf2.ser") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.igf2_ht <- emmeans(mod.igf2,
+                       pairwise ~ husbandry|time, 
+                       data    = dat.l |> 
+                         dplyr::filter(parameter == "igf2.ser") |> 
+                         droplevels() |> 
+                         drop_na(value), 
+                       adjust  = "tukey",
+                       lmer.df = "satterthwaite",
+                       type    = "response")
 
-emm
+emm.igf2_ht
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.igf2_ht,
          sigma = sigma(mod.igf2),
          edf = df.residual(mod.igf2))
 ```
@@ -1216,28 +1292,76 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.igf2,
-        pairwise ~ time|husbandry, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "igf2.ser") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.igf2_th <- emmeans(mod.igf2,
+                       pairwise ~ time|husbandry, 
+                       data    = dat.l |> 
+                         dplyr::filter(parameter == "igf2.ser") |> 
+                         droplevels() |> 
+                         drop_na(value), 
+                       adjust  = "tukey",
+                       lmer.df = "satterthwaite",
+                       type    = "response")
 
-emm
+emm.igf2_th
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.igf2_th,
          sigma = sigma(mod.igf2),
          edf = df.residual(mod.igf2))
 ```
 
 ## Plot
+
+Add significant contrasts to the plot:
+
+```{r}
+contr.igf2_ht <- contrast(emm.igf2_ht, method = "pairwise") |>
+  as.data.frame() |>
+  as_tibble() |>
+  mutate(p.label = dplyr::case_when(
+    p.value < 0.001 ~ "p < 0.001",
+    p.value < 0.05  ~ sprintf("p = %.3f", p.value),
+    TRUE            ~ NA_character_)) |>
+  # for brackets
+  mutate(
+    group1 = "conventional",
+    group2 = "ecological") |>
+  mutate(
+    x = as.numeric(time),
+    xmin = x - 0.25 * 0.5,
+    xmax = x + 0.25 * 0.5) |>
+  mutate(y.position = 130) |> 
+  # only significant results
+  dplyr::filter(!is.na(p.label))
+```
+
+```{r}
+contr.igf2_th <- contrast(emm.igf2_th, method = "pairwise") |>
+  as.data.frame() |>
+  as_tibble() |>
+  mutate(p.label = dplyr::case_when(
+    p.value < 0.001 ~ "p < 0.001",
+    p.value < 0.05  ~ sprintf("p = %.3f", p.value),
+    TRUE            ~ NA_character_)) |>
+  # for brackets
+  mutate(
+    group1 = "105dpc",
+    group2 = "8dpp") |>
+  mutate(
+    xmin = case_when(
+      husbandry == "conventional" ~ 0.875,
+      husbandry == "ecological"   ~ 1.125
+    ),
+    xmax = case_when(
+      husbandry == "conventional" ~ 1.875,
+      husbandry == "ecological"   ~ 2.125)) |>
+  mutate(y.position = 150) |> 
+  # only significant results
+  dplyr::filter(!is.na(p.label))
+```
 
 ```{r}
 plot.igf2 <- dat.l  |> 
@@ -1258,12 +1382,37 @@ plot.igf2 <- dat.l  |>
                                               dodge.width   = 0.5),
               size = 2, alpha = 0.7,
               show.legend = FALSE) +
+  ggpubr::stat_pvalue_manual(
+    contr.igf2_ht,
+    inherit.aes = FALSE,
+    label = "p.label",
+    xmin = "xmin",
+    xmax = "xmax",
+    y.position = "y.position",
+    size = 14/.pt,
+    bracket.size = 0.8, 
+    tip.length = 0.03,
+    position = position_dodge(width = 0.5)) +
+  ggpubr::stat_pvalue_manual(
+    contr.igf2_th,
+    inherit.aes = FALSE,
+    label = "p.label",
+    xmin = "xmin",
+    xmax = "xmax",
+    y.position = "y.position",
+    step.increase = 0.1,
+    size = 14/.pt,
+    bracket.size = 0.8, 
+    tip.length = 0.03,
+    position = position_dodge(width = 0.5)) +
   scale_fill_manual(labels = c("Conventional",
                                "Ecological"),
                     values = c("#FFA040", "#008000")) +
-  scale_y_continuous(lim = c(0, 200), 
-                     breaks = seq(0, 200, 50),
-                     minor_breaks = seq(0, 200, by = 10) ) +
+  scale_y_continuous(breaks = seq(0, 160, 50),
+                     minor_breaks = seq(0, 160, by = 10),
+                     expand = expansion(mult = c(0.05, 0.1))) +
+  # important to define limits of the coord system not of the y-axis
+  coord_cartesian(ylim = c(0, 160), clip = "off") +
   scale_x_discrete(labels= c("105dpc", "8dpp")) +
   labs(x = "",
        y = "IGF2 (serum) [ng/ml]",
@@ -1271,8 +1420,9 @@ plot.igf2 <- dat.l  |>
   guides(y = guide_axis(minor.ticks = TRUE),
          fill = guide_legend(override.aes = list(linetype = 0, size  = 5))) +
   my_theme +
-  theme(legend.position = c(0.25, 0.85),
-        legend.box = "horizontal")
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
 ```
 
 ```{r, fig.height=8, fig.width=8, warning=FALSE}
@@ -1285,8 +1435,7 @@ plot.igf2
 # Combine plots with a designated area for the legend
 combined <- (plot.cort1 + 
              plot.cort2 + 
-             plot.bioact + 
-             plot.igf1) + 
+             plot.bioact) + 
   plot_layout(guides = "collect") +
   plot_annotation(tag_levels = 'A') &
   theme(plot.tag = element_text(face = "bold", size = 20),
@@ -1300,7 +1449,7 @@ combined
 
 ```{r, eval = TRUE}
 png("./plots/figure3.png",
-     width = 300, height = 300, units = "mm",
+     width = 300, height = 200, units = "mm",
      pointsize = 10, res = 600)
 
 combined
@@ -1312,11 +1461,13 @@ dev.off()
 
 ```{r}
 # Combine plots with a designated area for the legend
-combined <- (plot.igf2 +
-             plot.corr) + 
-  #plot_layout(guides = "collect") +
+combined <- (plot.igf1 + 
+             plot.igf2) + 
+  plot_layout(guides = "collect") +
   plot_annotation(tag_levels = 'A') &
-  theme(plot.tag = element_text(face = "bold", size = 20))
+  theme(plot.tag = element_text(face = "bold", size = 20),
+        legend.position = "bottom",
+        legend.direction = "horizontal")
 ```
 
 ```{r, fig.height=20, fig.width=20, warning=FALSE}
@@ -1354,9 +1505,9 @@ plot.bio.li <- dat.w  |>
   scale_fill_manual(labels = c("Conventional",
                                "Ecological"),
                     values = c("#FFA040", "#008000")) +
-  scale_y_continuous(lim = c(0, 600), 
-                     breaks = seq(0, 600, 200),
-                     minor_breaks = seq(0, 600, by = 50) ) +
+  scale_y_continuous(lim = c(0, 200), 
+                     breaks = seq(0, 200, 50),
+                     minor_breaks = seq(0, 200, by = 10) ) +
   scale_x_discrete(labels= c("1st", "2nd", "3rd")) +
   labs(x = "Litter number",
        y = "IGF bioactivity 105dpc [ng/ml]",
@@ -1386,9 +1537,9 @@ plot.lbw.li <- dat.w  |>
   scale_fill_manual(labels = c("Conventional",
                                "Ecological"),
                     values = c("#FFA040", "#008000")) +
-  scale_y_continuous(lim = c(0, 100), 
-                     breaks = seq(0, 100, 20),
-                     minor_breaks = seq(0, 100, by = 5) ) +
+  scale_y_continuous(lim = c(0, 85), 
+                     breaks = seq(0, 85, 20),
+                     minor_breaks = seq(0, 80, by = 5) ) +
   scale_x_discrete(labels= c("1st", "2nd", "3rd")) +
   labs(x = "Litter number",
        y = "Proportion LBW [%]",
@@ -1399,7 +1550,7 @@ plot.lbw.li <- dat.w  |>
          fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
 ```
 
-# Combined plots: Figure 5
+# Combined plots
 
 ```{r}
 # Combine plots with a designated area for the legend
@@ -1413,16 +1564,6 @@ combined <- (plot.bio.li +
 
 ```{r, fig.height=20, fig.width=20, warning=FALSE}
 combined
-```
-
-```{r, eval = TRUE}
-png("./plots/figure5.png",
-     width = 300, height = 200, units = "mm",
-     pointsize = 10, res = 600)
-
-combined
-
-dev.off()
 ```
 
 # IGFBP2 (serum)
@@ -1550,23 +1691,23 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.igfbp2,
-        pairwise ~ husbandry|time, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "igfbp2.ser") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.igfbp2_ht <- emmeans(mod.igfbp2,
+                         pairwise ~ husbandry|time, 
+                         data    = dat.l |> 
+                           dplyr::filter(parameter == "igfbp2.ser") |> 
+                           droplevels() |> 
+                           drop_na(value), 
+                         adjust  = "tukey",
+                         lmer.df = "satterthwaite",
+                         type    = "response")
 
-emm
+emm.igfbp2_ht
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.igfbp2_ht,
          sigma = sigma(mod.igfbp2),
          edf = df.residual(mod.igfbp2))
 ```
@@ -1576,23 +1717,23 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.igfbp2,
-        pairwise ~ time|husbandry, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "igfbp2.ser") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.igfbp2_th <- emmeans(mod.igfbp2,
+                         pairwise ~ time|husbandry, 
+                         data    = dat.l |> 
+                           dplyr::filter(parameter == "igfbp2.ser") |> 
+                           droplevels() |> 
+                           drop_na(value), 
+                         adjust  = "tukey",
+                         lmer.df = "satterthwaite",
+                         type    = "response")
 
-emm
+emm.igfbp2_th
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.igfbp2_th,
          sigma = sigma(mod.igfbp2),
          edf = df.residual(mod.igfbp2))
 ```
@@ -1763,23 +1904,23 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.igfbp3,
-        pairwise ~ husbandry|time, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "igfbp3.ser") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.igfbp3_ht <- emmeans(mod.igfbp3,
+                         pairwise ~ husbandry|time, 
+                         data    = dat.l |> 
+                           dplyr::filter(parameter == "igfbp3.ser") |> 
+                           droplevels() |> 
+                           drop_na(value), 
+                         adjust  = "tukey",
+                         lmer.df = "satterthwaite",
+                         type    = "response")
 
-emm
+emm.igfbp3_ht
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.igfbp3_ht,
          sigma = sigma(mod.igfbp3),
          edf = df.residual(mod.igfbp3))
 ```
@@ -1789,23 +1930,23 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.igfbp3,
-        pairwise ~ time|husbandry, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "igfbp3.ser") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.igfbp3_th <- emmeans(mod.igfbp3,
+                         pairwise ~ time|husbandry, 
+                         data    = dat.l |> 
+                           dplyr::filter(parameter == "igfbp3.ser") |> 
+                           droplevels() |> 
+                           drop_na(value), 
+                         adjust  = "tukey",
+                         lmer.df = "satterthwaite",
+                         type    = "response")
 
-emm
+emm.igfbp3_th
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.igfbp3_th,
          sigma = sigma(mod.igfbp3),
          edf = df.residual(mod.igfbp3))
 ```
@@ -1976,23 +2117,23 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.igfbp23,
-        pairwise ~ husbandry|time, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "igfbp23.ser") |> 
-          droplevels() |>
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.igfbp23_ht <- emmeans(mod.igfbp23,
+                          pairwise ~ husbandry|time, 
+                          data    = dat.l |> 
+                            dplyr::filter(parameter == "igfbp23.ser") |> 
+                            droplevels() |>
+                            drop_na(value), 
+                          adjust  = "tukey",
+                          lmer.df = "satterthwaite",
+                          type    = "response")
 
-emm
+emm.igfbp23_ht
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.igfbp23_ht,
          sigma = sigma(mod.igfbp23),
          edf = df.residual(mod.igfbp23))
 ```
@@ -2002,28 +2143,55 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.igfbp23,
-        pairwise ~ time|husbandry, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "igfbp23.ser") |> 
-          droplevels() |>
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.igfbp23_th <- emmeans(mod.igfbp23,
+                          pairwise ~ time|husbandry, 
+                          data    = dat.l |> 
+                            dplyr::filter(parameter == "igfbp23.ser") |> 
+                            droplevels() |>
+                            drop_na(value), 
+                          adjust  = "tukey",
+                          lmer.df = "satterthwaite",
+                          type    = "response")
 
-emm
+emm.igfbp23_th
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.igfbp23_th,
          sigma = sigma(mod.igfbp23),
          edf = df.residual(mod.igfbp23))
 ```
 
 ## Plot
+
+Add significant contrasts to the plot:
+
+```{r}
+contr.igfbp23_th <- contrast(emm.igfbp23_th, method = "pairwise") |>
+  as.data.frame() |>
+  as_tibble() |>
+  mutate(p.label = dplyr::case_when(
+    p.value < 0.001 ~ "p < 0.001",
+    p.value < 0.05  ~ sprintf("p = %.3f", p.value),
+    TRUE            ~ NA_character_)) |>
+  # for brackets
+  mutate(
+    group1 = "105dpc",
+    group2 = "8dpp") |>
+  mutate(
+    xmin = case_when(
+      husbandry == "conventional" ~ 0.875,
+      husbandry == "ecological"   ~ 1.125
+    ),
+    xmax = case_when(
+      husbandry == "conventional" ~ 1.875,
+      husbandry == "ecological"   ~ 2.125)) |>
+  mutate(y.position = 2.3) |> 
+  # only significant results
+  dplyr::filter(!is.na(p.label))
+```
 
 ```{r}
 plot.igfbp23 <- dat.l  |> 
@@ -2044,12 +2212,26 @@ plot.igfbp23 <- dat.l  |>
                                               dodge.width   = 0.5),
               size = 2, alpha = 0.7,
               show.legend = FALSE) +
+  ggpubr::stat_pvalue_manual(
+    contr.igfbp23_th,
+    inherit.aes = FALSE,
+    label = "p.label",
+    xmin = "xmin",
+    xmax = "xmax",
+    y.position = "y.position",
+    step.increase = 0.1,
+    size = 14/.pt,
+    bracket.size = 0.8, 
+    tip.length = 0.03,
+    position = position_dodge(width = 0.5)) +
   scale_fill_manual(labels = c("Conventional",
                                "Ecological"),
                     values = c("#FFA040", "#008000")) +
-  scale_y_continuous(lim = c(0, 2.5), 
-                     breaks = seq(0, 2.5, 0.5),
-                     minor_breaks = seq(0, 2.5, by = 0.1) ) +
+  scale_y_continuous(breaks = seq(0, 2.5, 0.5),
+                     minor_breaks = seq(0, 2.5, by = 0.1),
+                     expand = expansion(mult = c(0.05, 0.1))) +
+  # important to define limits of the coord system not of the y-axis
+  coord_cartesian(ylim = c(0, 2.5), clip = "off") +
   scale_x_discrete(labels= c("105dpc", "8dpp")) +
   labs(x = "",
        y = "Molar ratio of IGFBP2/IGFBP3 (serum)",
@@ -2062,219 +2244,6 @@ plot.igfbp23 <- dat.l  |>
 
 ```{r, fig.height=8, fig.width=8, warning=FALSE}
 plot.igfbp23
-```
-
-# Proteolytic activity (serum)
-
-## Model
-
-```{r}
-hist(dat.l |> 
-       dplyr::filter(parameter == "proteolysis") |> 
-       droplevels() |> 
-       drop_na(value) |> 
-       pull("value"), 
-     breaks = 30)
-
-hist(log(dat.l |> 
-         dplyr::filter(parameter == "proteolysis") |> 
-         droplevels() |> 
-         drop_na(value) |> 
-         pull("value")),
-     breaks = 30)
-```
-
-Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
-
-```{r}
-mod.prot <- lmerTest::lmer(log(value+1) ~ 
-                               husbandry +
-                               time +
-                               # interaction term
-                               husbandry : time +
-                               # random intercept for sows and for each litter within sow
-                               (1 | sow/litter.no),
-                             data    = dat.l |> 
-                              dplyr::filter(parameter == "proteolysis") |> 
-                              droplevels() |> 
-                              drop_na(value),
-                             REML    = TRUE,
-                             control = contr)
-```
-
-```{r}
-summary(mod.prot)
-```
-
-```{r}
-round(drop1(mod.prot, test = 'Chisq'), 3)
-```
-
-Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
-
-```{r}
-car::Anova(mod.prot,
-           test.statistic = "Chisq",
-           type = 2)
-```
-
-```{r}
-car::Anova(mod.prot,
-           test.statistic = "F",
-           type = 2)
-```
-
-## Model diagnostics
-
-```{r}
-performance::check_model(mod.prot)
-```
-
-## Emmeans & Effect sizes
-
-### Husbandry
-
-Emmeans:
-
-```{r}
-emm <- emmeans(mod.prot,
-        pairwise ~ husbandry, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "proteolysis") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
-
-emm
-```
-
-Effect sizes:
-
-```{r}
-eff_size(emm,
-         sigma = sigma(mod.prot),
-         edf = df.residual(mod.prot))
-```
-
-### Time point
-
-Emmeans:
-
-```{r}
-emm <- emmeans(mod.prot,
-        pairwise ~ time, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "proteolysis") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
-
-emm
-```
-
-Effect sizes:
-
-```{r}
-eff_size(emm,
-         sigma = sigma(mod.prot),
-         edf = df.residual(mod.prot))
-```
-
-### Husbandry:Time point
-
-Emmeans:
-
-```{r}
-emm <- emmeans(mod.prot,
-        pairwise ~ husbandry|time, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "proteolysis") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
-
-emm
-```
-
-Effect sizes:
-
-```{r}
-eff_size(emm,
-         sigma = sigma(mod.prot),
-         edf = df.residual(mod.prot))
-```
-
-### Time point:Husbandry
-
-Emmeans:
-
-```{r}
-emm <- emmeans(mod.prot,
-        pairwise ~ time|husbandry, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "proteolysis") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
-
-emm
-```
-
-Effect sizes:
-
-```{r}
-eff_size(emm,
-         sigma = sigma(mod.prot),
-         edf = df.residual(mod.prot))
-```
-
-## Plot
-
-```{r}
-plot.prot <- dat.l  |> 
-  dplyr::filter(parameter == "proteolysis") |> 
-  droplevels() |> 
-  drop_na(value) |> 
-  # plot
-  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
-  ggplot(aes(y   = value)) +
-  geom_boxplot(aes(x   = time, 
-                   fill = husbandry),
-               col = "black",
-               outlier.shape = NA, width = 0.5) +
-  geom_jitter(aes(x   = time,
-                  fill = husbandry),
-              col = "black",
-              position = position_jitterdodge(jitter.width  = 0.15,
-                                              dodge.width   = 0.5),
-              size = 2, alpha = 0.7,
-              show.legend = FALSE) +
-  scale_fill_manual(labels = c("Conventional",
-                               "Ecological"),
-                    values = c("#FFA040", "#008000")) +
-  scale_y_continuous(lim = c(0, 21), 
-                     breaks = seq(0, 21, 5),
-                     minor_breaks = seq(0, 21, by = 1) ) +
-  scale_x_discrete(labels= c("105dpc", "8dpp")) +
-  labs(x = "",
-       y = "Proteolytic activity (serum) [%]",
-       fill = "Husbandry") +
-  my_theme +
-  theme(legend.position = "top") +
-  guides(y = guide_axis(minor.ticks = TRUE),
-         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
-```
-
-```{r, fig.height=8, fig.width=8, warning=FALSE}
-plot.prot
 ```
 
 # Stanniocalcin, STC1 (serum)
@@ -2402,23 +2371,23 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.stc1,
-        pairwise ~ husbandry|time, 
-        data    = dat.l |>
-          dplyr::filter(parameter == "stc1") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.stc1_ht <- emmeans(mod.stc1,
+                       pairwise ~ husbandry|time, 
+                       data    = dat.l |>
+                         dplyr::filter(parameter == "stc1") |> 
+                         droplevels() |> 
+                         drop_na(value), 
+                       adjust  = "tukey",
+                       lmer.df = "satterthwaite",
+                       type    = "response")
 
-emm
+emm.stc1_ht
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.stc1_ht,
          sigma = sigma(mod.stc1),
          edf = df.residual(mod.stc1))
 ```
@@ -2428,28 +2397,76 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.stc1,
-        pairwise ~ time|husbandry, 
-        data    = dat.l |>
-          dplyr::filter(parameter == "stc1") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.stc1_th <- emmeans(mod.stc1,
+                       pairwise ~ time|husbandry, 
+                       data    = dat.l |>
+                         dplyr::filter(parameter == "stc1") |> 
+                         droplevels() |> 
+                         drop_na(value), 
+                       adjust  = "tukey",
+                       lmer.df = "satterthwaite",
+                       type    = "response")
 
-emm
+emm.stc1_th
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.stc1_th,
          sigma = sigma(mod.stc1),
          edf = df.residual(mod.stc1))
 ```
 
 ## Plot
+
+Add significant contrasts to the plot:
+
+```{r}
+contr.stc1_ht <- contrast(emm.stc1_ht, method = "pairwise") |>
+  as.data.frame() |>
+  as_tibble() |>
+  mutate(p.label = dplyr::case_when(
+    p.value < 0.001 ~ "p < 0.001",
+    p.value < 0.05  ~ sprintf("p = %.3f", p.value),
+    TRUE            ~ NA_character_)) |>
+  # for brackets
+  mutate(
+    group1 = "conventional",
+    group2 = "ecological") |>
+  mutate(
+    x = as.numeric(time),
+    xmin = x - 0.25 * 0.5,
+    xmax = x + 0.25 * 0.5) |>
+  mutate(y.position = 9000) |> 
+  # only significant results
+  dplyr::filter(!is.na(p.label))
+```
+
+```{r}
+contr.stc1_th <- contrast(emm.stc1_th, method = "pairwise") |>
+  as.data.frame() |>
+  as_tibble() |>
+  mutate(p.label = dplyr::case_when(
+    p.value < 0.001 ~ "p < 0.001",
+    p.value < 0.05  ~ sprintf("p = %.3f", p.value),
+    TRUE            ~ NA_character_)) |>
+  # for brackets
+  mutate(
+    group1 = "105dpc",
+    group2 = "8dpp") |>
+  mutate(
+    xmin = case_when(
+      husbandry == "conventional" ~ 0.875,
+      husbandry == "ecological"   ~ 1.125
+    ),
+    xmax = case_when(
+      husbandry == "conventional" ~ 1.875,
+      husbandry == "ecological"   ~ 2.125)) |>
+  mutate(y.position = 10000) |> 
+  # only significant results
+  dplyr::filter(!is.na(p.label))
+```
 
 ```{r}
 plot.stc1 <- dat.l  |> 
@@ -2470,12 +2487,37 @@ plot.stc1 <- dat.l  |>
                                               dodge.width   = 0.5),
               size = 2, alpha = 0.7,
               show.legend = FALSE) +
+  ggpubr::stat_pvalue_manual(
+    contr.stc1_ht,
+    inherit.aes = FALSE,
+    label = "p.label",
+    xmin = "xmin",
+    xmax = "xmax",
+    y.position = "y.position",
+    size = 14/.pt,
+    bracket.size = 0.8, 
+    tip.length = 0.03,
+    position = position_dodge(width = 0.5)) +
+  ggpubr::stat_pvalue_manual(
+    contr.stc1_th,
+    inherit.aes = FALSE,
+    label = "p.label",
+    xmin = "xmin",
+    xmax = "xmax",
+    y.position = "y.position",
+    step.increase = 0.1,
+    size = 14/.pt,
+    bracket.size = 0.8, 
+    tip.length = 0.03,
+    position = position_dodge(width = 0.5)) +
   scale_fill_manual(labels = c("Conventional",
                                "Ecological"),
                     values = c("#FFA040", "#008000")) +
-  scale_y_continuous(lim = c(0, 10000), 
-                     breaks = seq(0, 10000, 2000),
-                     minor_breaks = seq(0, 10000, by = 400) ) +
+  scale_y_continuous(breaks = seq(0, 10000, 2000),
+                     minor_breaks = seq(0, 10000, by = 400),
+                     expand = expansion(mult = c(0.05, 0.1))) +
+  # important to define limits of the coord system not of the y-axis
+  coord_cartesian(ylim = c(0, 10000), clip = "off") +
   scale_x_discrete(labels= c("105dpc", "8dpp")) +
   labs(x = "",
        y = "STC1 (serum) [pg/ml]",
@@ -2490,7 +2532,7 @@ plot.stc1 <- dat.l  |>
 plot.stc1
 ```
 
-# Combined plots: Figure 6
+# Combined plots: Figure 5
 
 ```{r}
 # Combine plots with a designated area for the legend
@@ -2506,13 +2548,226 @@ combined
 ```
 
 ```{r, eval = TRUE}
-png("./plots/figure6.png",
+png("./plots/figure5.png",
      width = 300, height = 200, units = "mm",
      pointsize = 10, res = 600)
 
 combined
 
 dev.off()
+```
+
+# Proteolytic activity (serum)
+
+## Model
+
+```{r}
+hist(dat.l |> 
+       dplyr::filter(parameter == "proteolysis") |> 
+       droplevels() |> 
+       drop_na(value) |> 
+       pull("value"), 
+     breaks = 30)
+
+hist(log(dat.l |> 
+         dplyr::filter(parameter == "proteolysis") |> 
+         droplevels() |> 
+         drop_na(value) |> 
+         pull("value")),
+     breaks = 30)
+```
+
+Singularity issues if nested structure defined like `(1 | sow/litter.no)`.
+
+```{r}
+mod.prot <- lmerTest::lmer(log(value+1) ~ 
+                               husbandry +
+                               time +
+                               # interaction term
+                               husbandry : time +
+                               # random intercept for sows and for each litter within sow
+                               (1 | sow/litter.no),
+                             data    = dat.l |> 
+                              dplyr::filter(parameter == "proteolysis") |> 
+                              droplevels() |> 
+                              drop_na(value),
+                             REML    = TRUE,
+                             control = contr)
+```
+
+```{r}
+summary(mod.prot)
+```
+
+```{r}
+round(drop1(mod.prot, test = 'Chisq'), 3)
+```
+
+Without significant interactions, choose `type = 2`. With significant interactions, choose `type = 3`.
+
+```{r}
+car::Anova(mod.prot,
+           test.statistic = "Chisq",
+           type = 2)
+```
+
+```{r}
+car::Anova(mod.prot,
+           test.statistic = "F",
+           type = 2)
+```
+
+## Model diagnostics
+
+```{r}
+performance::check_model(mod.prot)
+```
+
+## Emmeans & Effect sizes
+
+### Husbandry
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.prot,
+        pairwise ~ husbandry, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "proteolysis") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.prot),
+         edf = df.residual(mod.prot))
+```
+
+### Time point
+
+Emmeans:
+
+```{r}
+emm <- emmeans(mod.prot,
+        pairwise ~ time, 
+        data    = dat.l |> 
+          dplyr::filter(parameter == "proteolysis") |> 
+          droplevels() |> 
+          drop_na(value), 
+        adjust  = "tukey",
+        lmer.df = "satterthwaite",
+        type    = "response")
+
+emm
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm,
+         sigma = sigma(mod.prot),
+         edf = df.residual(mod.prot))
+```
+
+### Husbandry:Time point
+
+Emmeans:
+
+```{r}
+emm.prot_ht <- emmeans(mod.prot,
+                       pairwise ~ husbandry|time, 
+                       data    = dat.l |> 
+                         dplyr::filter(parameter == "proteolysis") |> 
+                         droplevels() |> 
+                         drop_na(value), 
+                       adjust  = "tukey",
+                       lmer.df = "satterthwaite",
+                       type    = "response")
+
+emm.prot_ht
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm.prot_ht,
+         sigma = sigma(mod.prot),
+         edf = df.residual(mod.prot))
+```
+
+### Time point:Husbandry
+
+Emmeans:
+
+```{r}
+emm.prot_th <- emmeans(mod.prot,
+                       pairwise ~ time|husbandry, 
+                       data    = dat.l |> 
+                         dplyr::filter(parameter == "proteolysis") |> 
+                         droplevels() |> 
+                         drop_na(value), 
+                       adjust  = "tukey",
+                       lmer.df = "satterthwaite",
+                       type    = "response")
+
+emm.prot_th
+```
+
+Effect sizes:
+
+```{r}
+eff_size(emm.prot_th,
+         sigma = sigma(mod.prot),
+         edf = df.residual(mod.prot))
+```
+
+## Plot
+
+```{r}
+plot.prot <- dat.l  |> 
+  dplyr::filter(parameter == "proteolysis") |> 
+  droplevels() |> 
+  drop_na(value) |> 
+  # plot
+  mutate(jit = jitter(as.numeric(time), 0.3)) |>  
+  ggplot(aes(y   = value)) +
+  geom_boxplot(aes(x   = time, 
+                   fill = husbandry),
+               col = "black",
+               outlier.shape = NA, width = 0.5) +
+  geom_jitter(aes(x   = time,
+                  fill = husbandry),
+              col = "black",
+              position = position_jitterdodge(jitter.width  = 0.15,
+                                              dodge.width   = 0.5),
+              size = 2, alpha = 0.7,
+              show.legend = FALSE) +
+  scale_fill_manual(labels = c("Conventional",
+                               "Ecological"),
+                    values = c("#FFA040", "#008000")) +
+  scale_y_continuous(lim = c(0, 21), 
+                     breaks = seq(0, 21, 5),
+                     minor_breaks = seq(0, 21, by = 1) ) +
+  scale_x_discrete(labels= c("105dpc", "8dpp")) +
+  labs(x = "",
+       y = "Proteolytic activity (serum) [%]",
+       fill = "Husbandry") +
+  my_theme +
+  theme(legend.position = "top") +
+  guides(y = guide_axis(minor.ticks = TRUE),
+         fill = guide_legend(override.aes = list(linetype = 0, size  = 5)))
+```
+
+```{r, fig.height=8, fig.width=8, warning=FALSE}
+plot.prot
 ```
 
 # Calcium (serum)
@@ -2643,24 +2898,24 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.calc,
-        pairwise ~ husbandry|time, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "calc") |> 
-          dplyr::filter(time != "30dpc") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.calc_ht <- emmeans(mod.calc,
+                       pairwise ~ husbandry|time, 
+                       data    = dat.l |> 
+                         dplyr::filter(parameter == "calc") |> 
+                         dplyr::filter(time != "30dpc") |> 
+                         droplevels() |> 
+                         drop_na(value), 
+                       adjust  = "tukey",
+                       lmer.df = "satterthwaite",
+                       type    = "response")
 
-emm
+emm.calc_ht
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.calc_ht,
          sigma = sigma(mod.calc),
          edf = df.residual(mod.calc))
 ```
@@ -2670,24 +2925,24 @@ eff_size(emm,
 Emmeans:
 
 ```{r}
-emm <- emmeans(mod.calc,
-        pairwise ~ time|husbandry, 
-        data    = dat.l |> 
-          dplyr::filter(parameter == "calc") |> 
-          dplyr::filter(time != "30dpc") |> 
-          droplevels() |> 
-          drop_na(value), 
-        adjust  = "tukey",
-        lmer.df = "satterthwaite",
-        type    = "response")
+emm.calc_th <- emmeans(mod.calc,
+                       pairwise ~ time|husbandry, 
+                       data    = dat.l |> 
+                         dplyr::filter(parameter == "calc") |> 
+                         dplyr::filter(time != "30dpc") |> 
+                         droplevels() |> 
+                         drop_na(value), 
+                       adjust  = "tukey",
+                       lmer.df = "satterthwaite",
+                       type    = "response")
 
-emm
+emm.calc_th
 ```
 
 Effect sizes:
 
 ```{r}
-eff_size(emm,
+eff_size(emm.calc_th,
          sigma = sigma(mod.calc),
          edf = df.residual(mod.calc))
 ```

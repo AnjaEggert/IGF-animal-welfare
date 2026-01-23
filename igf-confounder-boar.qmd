@@ -1,6 +1,7 @@
 ---
-title: "Confounder boar (Igf & animal welfare)"
-author: "Anja Eggert & Anne-Marie Galow"
+title: "Intertwining of the Igf system and animal welfare"
+subtitle: "Confounder boar"
+author: "Anja Eggert, Anne-Marie Galow, et al."
 date: "`r Sys.Date()`" 
 editor: visual
 code-fold: false

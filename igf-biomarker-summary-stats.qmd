@@ -1,6 +1,7 @@
 ---
-title: "Summary stats (Igf & animal welfare)"
-author: "Anja Eggert & Anne-Marie Galow"
+title: "Intertwining of the Igf system and animal welfare"
+subtitle: "Summary statistics"
+author: "Anja Eggert, Anne-Marie Galow, et al."
 date: "`r Sys.Date()`" 
 editor: visual
 code-fold: false

@@ -1,8 +1,8 @@
 # IGF-animal-welfare
 
-This repository contains data and source code to reproduce the data and statistical analysis and figures of the manuscript submitted to the journal "Biomarker Research":
+This repository contains data and source code to reproduce the data and statistical analysis and figures of the manuscript submitted to the journal "Scientific Reports":
 
-Potential of factors of the IGF system as biomarkers for animal welfare assessment
+Intertwining of the Igf system and animal welfare
 by Anne-Marie Galow1, Daniela Ohde1, Anja Eggert1, Christina Walz1, Marianne Zenk1, Chaithra Umesh2, Saptarshi Bej3, Olaf Wolkenhauer2 and Andreas Hoeflich1
 
 1Research Institute for Farm Animal Biology (FBN), Dummerstorf, Germany 
@@ -42,9 +42,8 @@ THE REPOSITORY CONTAINS:
 4. Folder *plots* with 8 plots:
     + `figure3.png`: Effects of the husbandry system on cortisol and IGF bioactivity
     + `figure4.png`: Husbandry dependent IGF concentrations
-    + `figure5.png`: Litter dependent husbandry effects
-    + `figure6.png`: Husbandry effects on regulators of IGF bioactivity 
-    + `figure7.png`: Principal Component Analysis (PCA) of 15 candidate parameters related to husbandry systems
-    + `figure8.png`: Dendrogram for hierarchical clustering of imputed dataset
+    + `figure5.png`: Husbandry effects on regulators of IGF bioactivity 
+    + `figure6.png`: Principal Component Analysis (PCA) of 15 candidate parameters related to husbandry systems
     + `ori-imp.png`: Comparison of data distributions for selected candidate parameters of the original and imputed data set, supplement
-    + `cluster1-cluster2.png`: Comparison of selected candidate parameters for the two main clusters obtained from hierarchical clustering, supplement
+    + `figure-age.png`: Dependency of variables on insemination age, supplement
+    + `figure-boar.png`: Conditions of litters depending on boar, supplement

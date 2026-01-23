@@ -19,20 +19,32 @@ In order to reference this software, please consider the information in the [CIT
 
 ## Usage
 
-We run the data and statistical analysis on Windows 11.
+We run the data and statistical analysis on Windows 11. With one exception, all data processing, modeling and visualization is done in R.
+Missing value imputation was done in Python.
+
+R Core Team (2024). R: A Language and Environment for Statistical Computing. R Foundation for Statistical Computing, Vienna, Austria.
+<https://www.R-project.org/>.
 
 THE REPOSITORY CONTAINS:
-1. Main folder with 5 quarto files and rendered reports
-2. Folder *data* with one xlsx-files:
-    + `data-matrix.xlsx`
-3. Folder *plots* with 10 plots:
-    + `figure3.png`
-    + `figure4.png`
-    + `figure5.png`
-    + `figure6.png`
-    + `figure7.png`
-    + `figure8.png`
-    + `figure-age.png`
-    + `figure-boar.png`
-    + `ori-imp.png`
-    + `cluster1-cluster2.png`
+1. Main folder with 5 quarto files and rendered reports in html
+    + `igf-biomarker-summary-stats.qmd`: data processing, data summary statistics, processed data saved in "./data/data-processed.RData"
+    + `igf-biomarker-models.qmd`: linear mixed models, generating figures, using `data-processed.RData`
+    + `igf-biomarker-pca.qmd`: PCA and cluster analysis, using `data-processed.RData` and imputed data from `missing_value_imputation.ipynb`
+    + `missing_value_imputation.ipynb`: Jupyter Notebook with kNN imputation in Python
+    + `igf-confounder-age.qmd`: linear mixed model including age, supplements
+    + `igf-confounder-boar.qmd`: linear mixed model including boars, supplements
+3. Folder *data* with one xlsx-files:
+    + `data-matrix.xlsx` with sheets:
+      + `data_ori`: measured data
+      + `data_ori_knn`: subset of variables used for kNN imputation
+      + `data_imp`: imputed data set
+      + `parameter description`: some meta information
+4. Folder *plots* with 8 plots:
+    + `figure3.png`: Effects of the husbandry system on cortisol and IGF bioactivity
+    + `figure4.png`: Husbandry dependent IGF concentrations
+    + `figure5.png`: Litter dependent husbandry effects
+    + `figure6.png`: Husbandry effects on regulators of IGF bioactivity 
+    + `figure7.png`: Principal Component Analysis (PCA) of 15 candidate parameters related to husbandry systems
+    + `figure8.png`: Dendrogram for hierarchical clustering of imputed dataset
+    + `ori-imp.png`: Comparison of data distributions for selected candidate parameters of the original and imputed data set, supplement
+    + `cluster1-cluster2.png`: Comparison of selected candidate parameters for the two main clusters obtained from hierarchical clustering, supplement
